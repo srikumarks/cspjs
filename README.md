@@ -57,6 +57,7 @@ as the final argument.
 2. You need to have the `state_machine.js` and `channel.js` modules in your npm
    path .. somewhere is your project local `node_modules`.
 3. To compile a `.sjs` file that uses the `task` macro, do -
+
         sjs --module ./path/to/src/task.js my-task-source.sjs > my-task-source.js
 
 For complete documentation, see the docco generated docs in `docs/*.html`.
