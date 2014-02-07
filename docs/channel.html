@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+  <title>channel.js</title>
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, target-densitydpi=160dpi, initial-scale=1.0; maximum-scale=1.0; user-scalable=0;">
+  <link rel="stylesheet" media="all" href="docco.css" />
+</head>
+<body>
+  <div id="container">
+    <div id="background"></div>
+    
+      <ul id="jump_to">
+        <li>
+          <a class="large" href="javascript:void(0);">Jump To &hellip;</a>
+          <a class="small" href="javascript:void(0);">+</a>
+          <div id="jump_wrapper">
+          <div id="jump_page">
+            
+              
+              <a class="source" href="channel.html">
+                channel.js
+              </a>
+            
+              
+              <a class="source" href="state_machine.html">
+                state_machine.js
+              </a>
+            
+              
+              <a class="source" href="task.html">
+                task.js
+              </a>
+            
+          </div>
+        </li>
+      </ul>
+    
+    <ul class="sections">
+        
+          <li id="title">
+              <div class="annotation">
+                  <h1>channel.js</h1>
+              </div>
+          </li>
+        
+        
+        
+        <li id="section-1">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-1">&#182;</a>
+              </div>
+              <p>A channel is a queue with a read-end and a write-end.
+Values are written and read asynchronously via callbacks.
+The basic channel is such that the callback associated
+with a value put into it will be called when the value
+is consumed from the read end.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">Channel</span><span class="hljs-params">()</span> {</span>
+    <span class="hljs-keyword">this</span>._queue = [];
+    <span class="hljs-keyword">this</span>._pending = [];
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>;
+}
+
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">sendValue</span><span class="hljs-params">(value, callback)</span> {</span>
+    callback &amp;&amp; process.nextTick(<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-params">()</span> {</span> callback(<span class="hljs-literal">null</span>, value); });
+}
+
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">sendError</span><span class="hljs-params">(err, callback)</span> {</span>
+    callback &amp;&amp; process.nextTick(<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-params">()</span> {</span> callback(err, <span class="hljs-literal">null</span>); });
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-2">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-2">&#182;</a>
+              </div>
+              <p>Read a value from the channel, passing the value to the given callback.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>Channel.prototype.take = <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-params">(callback)</span> {</span>
+    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>._queue.length &gt; <span class="hljs-number">0</span>) {
+        <span class="hljs-keyword">var</span> q = <span class="hljs-keyword">this</span>._queue.shift();
+        sendValue(q.value, q.callback);
+        sendValue(q.value, callback);
+    } <span class="hljs-keyword">else</span> {
+        callback &amp;&amp; <span class="hljs-keyword">this</span>._pending.push(callback);
+    }
+};</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-3">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-3">&#182;</a>
+              </div>
+              <p>Places a value into the channel. The callback will be called when the value is
+consumed from the read-end.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>Channel.prototype.put = <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-params">(value, callback)</span> {</span>
+    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>._pending.length &gt; <span class="hljs-number">0</span>) {
+        <span class="hljs-keyword">var</span> p = <span class="hljs-keyword">this</span>._pending.shift();
+        sendValue(value, callback);
+        sendValue(value, p);
+    } <span class="hljs-keyword">else</span> {
+        <span class="hljs-keyword">this</span>._queue.push({callback: callback, value: value});
+    }
+};
+
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">ReceivedChannelValue</span><span class="hljs-params">(id, err, value)</span> {</span>
+    <span class="hljs-keyword">this</span>.id = id;
+    <span class="hljs-keyword">this</span>.err = err;
+    <span class="hljs-keyword">this</span>.val = value;
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>;
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-4">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-4">&#182;</a>
+              </div>
+              <p>Makes a callback that will receive the value produced by
+some process and place the result into the channel. The
+“id” exists to identify the one producing the value.
+The “id”, “err” and “val” are all available on the
+channel.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>Channel.prototype.receive = <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-params">(id)</span> {</span>
+    <span class="hljs-keyword">var</span> self = <span class="hljs-keyword">this</span>;
+    <span class="hljs-keyword">return</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-params">(err, value)</span> {</span>
+        self.put(<span class="hljs-keyword">new</span> ReceivedChannelValue(id, err, value));
+    };
+};</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-5">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-5">&#182;</a>
+              </div>
+              <p>Answers “will read succeed immediately?”</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-built_in">Object</span>.defineProperty(Channel.prototype, <span class="hljs-string">'canRead'</span>, {
+    get: <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-params">()</span> {</span> 
+        <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>._queue.length &gt; <span class="hljs-number">0</span> &amp;&amp; <span class="hljs-keyword">this</span>._pending.length === <span class="hljs-number">0</span>;
+    }
+});</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-6">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-6">&#182;</a>
+              </div>
+              <p>Answers “will write succeed immediately?”</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-built_in">Object</span>.defineProperty(Channel.prototype, <span class="hljs-string">'canWrite'</span>, {
+    get: <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-params">()</span> {</span>
+        <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>._pending.length &gt; <span class="hljs-number">0</span> || <span class="hljs-keyword">this</span>._queue.length === <span class="hljs-number">0</span>;
+    }
+});</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-7">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-7">&#182;</a>
+              </div>
+              <p>Answers “how many values have been placed into the channel?”
+Positive values give the number of values available right away.
+Negative values give the number of pending take operations.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-built_in">Object</span>.defineProperty(Channel.prototype, <span class="hljs-string">'backlog'</span>, {
+    get: <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-params">()</span> {</span>
+        <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>._queue.length - <span class="hljs-keyword">this</span>._pending.length;
+    }
+});</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-8">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-8">&#182;</a>
+              </div>
+              <p>Makes a new channel whose values are transformed by the given
+function “f”. <code>cond(value)</code> is a function that specifies a 
+condition until which the mapping will continue.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>Channel.prototype.map = <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-params">(cond, f)</span> {</span>
+    <span class="hljs-keyword">var</span> ch2 = <span class="hljs-keyword">new</span> Channel();
+    <span class="hljs-keyword">var</span> self = <span class="hljs-keyword">this</span>;
+    <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">receive</span><span class="hljs-params">(err, value)</span> {</span>
+        <span class="hljs-keyword">if</span> (cond === <span class="hljs-literal">true</span> || cond(value)) {
+            ch2.put(f(value), loop);
+        } <span class="hljs-keyword">else</span> {
+            ch2.put(<span class="hljs-literal">null</span>);
+        }
+    }
+    <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">loop</span><span class="hljs-params">()</span> {</span>
+        self.take(receive);
+    }
+    process.nextTick(loop);
+    <span class="hljs-keyword">return</span> ch2;
+};</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-9">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-9">&#182;</a>
+              </div>
+              <p>Makes a new channel and pipes the values in this
+channel to it. Only the values that satisfy the
+predicate function ‘f’ are piped and others
+are dropped. ‘cond(value)’ gives the condition
+until which the piping will continue to run.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>Channel.prototype.filter = <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-params">(cond, f)</span> {</span>
+    <span class="hljs-keyword">var</span> ch2 = <span class="hljs-keyword">new</span> Channel();
+    <span class="hljs-keyword">var</span> self = <span class="hljs-keyword">this</span>;
+    <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">receive</span><span class="hljs-params">(err, value)</span> {</span>
+        <span class="hljs-keyword">if</span> (cond === <span class="hljs-literal">true</span> || cond(value)) {
+            <span class="hljs-keyword">if</span> (f(value)) {
+                ch2.put(value, loop);
+            } <span class="hljs-keyword">else</span> {
+                loop();
+            }
+        } <span class="hljs-keyword">else</span> {
+            ch2.put(<span class="hljs-literal">null</span>);
+        }
+    }
+    <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">loop</span><span class="hljs-params">()</span> {</span>
+        self.take(receive);
+    }
+    process.nextTick(loop);
+    <span class="hljs-keyword">return</span> ch2;
+};</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-10">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-10">&#182;</a>
+              </div>
+              <p>Makes a new channel, reduces the values produced
+by this channel using the function “f” as long
+as “cond()” is satisfied and once all folding is done,
+sends the result to the new channel.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>Channel.prototype.reduce = <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-params">(initial, cond, f)</span> {</span>
+    <span class="hljs-keyword">var</span> ch2 = <span class="hljs-keyword">new</span> Channel();
+    <span class="hljs-keyword">var</span> self = <span class="hljs-keyword">this</span>;
+    <span class="hljs-keyword">var</span> result = initial;
+    <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">receive</span><span class="hljs-params">(err, value)</span> {</span>
+        result = f(result, value);
+        process.nextTick(loop);
+    }
+    <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">loop</span><span class="hljs-params">()</span> {</span>
+        <span class="hljs-keyword">if</span> (cond()) {
+            self.take(receive);
+        } <span class="hljs-keyword">else</span> {
+            ch2.put(result);
+        }
+    }
+    process.nextTick(loop);
+    <span class="hljs-keyword">return</span> ch2;
+};</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-11">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-11">&#182;</a>
+              </div>
+              <p>Makes a new channel and pipes the values put into this
+channel in groups of N. </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>Channel.prototype.group = <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-params">(N)</span> {</span>
+    <span class="hljs-keyword">var</span> gch = <span class="hljs-keyword">new</span> Channel();
+    <span class="hljs-keyword">var</span> group = [];
+    <span class="hljs-keyword">var</span> self = <span class="hljs-keyword">this</span>;
+
+    <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">receive</span><span class="hljs-params">(err, value)</span> {</span>
+        group.push(value);
+        <span class="hljs-keyword">if</span> (group.length &lt; N) {
+            process.nextTick(loop);
+        } <span class="hljs-keyword">else</span> {
+            <span class="hljs-keyword">var</span> g = group;
+            group = [];
+            gch.put(g, receive);
+        }
+    }
+
+    <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">loop</span><span class="hljs-params">()</span> {</span>
+        self.take(receive);
+    }
+
+    process.nextTick(loop);
+    <span class="hljs-keyword">return</span> gch;
+};</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-12">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-12">&#182;</a>
+              </div>
+              <p>Temporarily switches the channel to a mode where it will
+collect the next N items into a group and pass it on to
+the callback.</p>
+<p>Use within task like this -
+     var ch = new Channel();
+     …
+     x &lt;- ch.takeN(10);</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>Channel.prototype.takeN = <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-params">(N, callback)</span> {</span>
+    <span class="hljs-keyword">var</span> group = [];
+    <span class="hljs-keyword">var</span> self = <span class="hljs-keyword">this</span>;
+    <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">receive</span><span class="hljs-params">(err, value)</span> {</span>
+        <span class="hljs-keyword">if</span> (err) {
+            <span class="hljs-keyword">return</span> sendError(err, callback);
+        }
+        group.push(value);
+        <span class="hljs-keyword">if</span> (group.length &lt; N) {
+            self.take(receive);
+        } <span class="hljs-keyword">else</span> {
+            sendValue(group, callback);
+        }
+    }
+    self.take(receive);
+};
+
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">MergedChannelValue</span><span class="hljs-params">(i, ch, err, value)</span> {</span>
+    <span class="hljs-keyword">this</span>.ix = i;
+    <span class="hljs-keyword">this</span>.chan = ch;
+    <span class="hljs-keyword">this</span>.err = err;
+    <span class="hljs-keyword">this</span>.val = value;
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>;
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-13">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-13">&#182;</a>
+              </div>
+              <p>Makes a new channel that receives the values put into
+all the given channels (which is an array of channels).
+The value produced by a merged channel is a wrapper object
+that has three fields - “chan” giving the channel that 
+produced the value, “val” giving the value and “ix” 
+giving the index of the channel in the array that produced
+the value. If any of the source channels callback with
+an err (which is never supposed to happen) or “null” value 
+(which can happen), the channel will cease to send its output
+to the merged channel.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>Channel.merge = <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-params">(channels)</span> {</span>
+    <span class="hljs-keyword">var</span> channel = <span class="hljs-keyword">new</span> Channel();
+
+    <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">piper</span><span class="hljs-params">(ch, i)</span> {</span>
+        <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">writer</span><span class="hljs-params">(err, value)</span> {</span>
+            channel.put(<span class="hljs-keyword">new</span> MergedChannelValue(i, ch, err, value), reader);
+        }
+        <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">reader</span><span class="hljs-params">(err, value)</span> {</span>
+            ch.take(writer);
+        }
+        reader(<span class="hljs-literal">null</span>, <span class="hljs-literal">null</span>);
+    }
+
+    channels.forEach(piper);
+
+    <span class="hljs-keyword">return</span> channel;
+};</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-14">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-14">&#182;</a>
+              </div>
+              <p>Makes a “timeout” channel, where every time someone pulls
+a value from it, it is delivered after “ms” milliseconds.
+This channel is not writeable.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>Channel.timeout = <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-params">(ms)</span> {</span>
+    <span class="hljs-keyword">var</span> channel = <span class="hljs-keyword">new</span> Channel();
+    channel._timeInterval_ms = ms;
+    channel.take = timeoutTake;
+    <span class="hljs-keyword">return</span> channel;
+};
+
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">timeoutTick</span><span class="hljs-params">(channel)</span> {</span>
+    channel.put(<span class="hljs-literal">true</span>);
+}
+
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">timeoutTake</span><span class="hljs-params">(callback)</span> {</span>
+    setTimeout(timeoutTick, <span class="hljs-keyword">this</span>._timeInterval_ms, <span class="hljs-keyword">this</span>);
+    Channel.prototype.take.call(<span class="hljs-keyword">this</span>, callback);
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-15">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-15">&#182;</a>
+              </div>
+              <p>Makes a “clock” channel which, once started, will produce
+values counting upwards from <code>startCounter</code>, until the
+<code>stop()</code> method is called on the channel. Calling <code>start()</code>
+will have an effect only when the clock is stopped.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>Channel.clock = <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-params">(ms)</span> {</span>
+    <span class="hljs-keyword">var</span> channel = <span class="hljs-keyword">new</span> Channel();
+    channel._timer = <span class="hljs-literal">null</span>;
+    channel._timeInterval_ms = ms;
+    channel._counter = <span class="hljs-number">0</span>;
+    channel.start = clockStart;
+    channel.stop = clockStop;
+    <span class="hljs-keyword">return</span> channel;
+};
+
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">clockTick</span><span class="hljs-params">(clock)</span> {</span>
+    clock.put(clock._counter++);
+}
+
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">clockStart</span><span class="hljs-params">(startCounter)</span> {</span>
+    <span class="hljs-keyword">if</span> (!<span class="hljs-keyword">this</span>._timer) {
+        startCounter = <span class="hljs-built_in">arguments</span>.length &lt; <span class="hljs-number">1</span> ? <span class="hljs-number">1</span> : startCounter;
+        <span class="hljs-keyword">this</span>._counter = startCounter;
+        <span class="hljs-keyword">this</span>._timer = setInterval(clockTick, <span class="hljs-keyword">this</span>._timeInterval_ms, <span class="hljs-keyword">this</span>);
+    }
+}
+
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">clockStop</span><span class="hljs-params">()</span> {</span>
+    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>._timer) {
+        clearInterval(<span class="hljs-keyword">this</span>._timer);
+        <span class="hljs-keyword">this</span>._timer = <span class="hljs-literal">null</span>;
+    }
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-16">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-16">&#182;</a>
+              </div>
+              <p>Returns a wrapped interface to channel which will
+debounce the values placed on it - i.e. it will
+reject put() operations that occur within a time
+of “ms” milliseconds between each other.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>Channel.debounce = <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-params">(ms, channel)</span> {</span>
+    <span class="hljs-keyword">var</span> ch = <span class="hljs-built_in">Object</span>.create(channel);
+    ch._channel = channel;
+    ch._debounceInterval_ms = ms;
+    ch._lastPutTime = <span class="hljs-number">0</span>;
+    ch.put = debouncingPut;
+    <span class="hljs-keyword">return</span> ch;
+};
+
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">debouncingPut</span><span class="hljs-params">(value, callback)</span> {</span>
+    <span class="hljs-keyword">var</span> now = <span class="hljs-built_in">Date</span>.now();
+    <span class="hljs-keyword">if</span> (now - <span class="hljs-keyword">this</span>._lastPutTime &gt;= <span class="hljs-keyword">this</span>._debounceInterval_ms) {
+        <span class="hljs-keyword">this</span>._lastPutTime = now;
+        <span class="hljs-keyword">this</span>._channel.put(value, callback);
+    } <span class="hljs-keyword">else</span> {
+        sendValue(<span class="hljs-literal">null</span>, callback);
+    }
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-17">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-17">&#182;</a>
+              </div>
+              <p>Wraps the given channel with an interface such
+that put() operations will immediately succeed
+as long as fewer than N values have been placed
+on the channel.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>Channel.buffered = <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-params">(N, channel)</span> {</span>
+    <span class="hljs-keyword">var</span> ch = <span class="hljs-built_in">Object</span>.create(channel);
+    ch._channel = channel;
+    ch._bufferLength = N;
+    ch.put = bufferedPut;
+    ch.take = bufferedTake;
+    <span class="hljs-keyword">return</span> ch;
+};
+
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">bufferedPut</span><span class="hljs-params">(value, callback)</span> {</span>
+    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.backlog &lt; <span class="hljs-keyword">this</span>._bufferLength) {
+        <span class="hljs-keyword">this</span>._channel.put(value);
+        sendValue(value, callback);
+    } <span class="hljs-keyword">else</span> {
+        <span class="hljs-keyword">this</span>._channel.put(value, callback);
+    }
+}
+
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">bufferedTake</span><span class="hljs-params">(callback)</span> {</span>
+    <span class="hljs-keyword">this</span>._channel.take(callback);
+    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>._queue.length &gt;= <span class="hljs-keyword">this</span>._bufferLength - <span class="hljs-number">1</span>) {
+        <span class="hljs-keyword">var</span> q = <span class="hljs-keyword">this</span>._queue[N-<span class="hljs-number">2</span>];
+        sendValue(q.value, q.callback);
+        q.callback = <span class="hljs-literal">null</span>;
+    }
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-18">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-18">&#182;</a>
+              </div>
+              <p>If more than N values have been placed into a channel
+and a writer tries to place one more value, sometimes
+we want the new value to be dropped in order that
+processing requirements don’t accumulate. This is
+the purpose of <code>droppingAfter</code> which wraps the 
+parent channel’s <code>put</code> to do this dropping.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>
+Channel.prototype.droppingAfter = <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-params">(N)</span> {</span>
+    <span class="hljs-keyword">var</span> ch = <span class="hljs-built_in">Object</span>.create(<span class="hljs-keyword">this</span>);
+    ch._channel = <span class="hljs-keyword">this</span>;
+    ch._bufferLength = N;
+    ch.put = droppingPut;
+    <span class="hljs-keyword">return</span> ch;
+};
+
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">droppingPut</span><span class="hljs-params">(value, callback)</span> {</span>
+    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.backlog &lt; <span class="hljs-keyword">this</span>._bufferLength) {
+        <span class="hljs-keyword">this</span>._channel.put(value, callback);
+    } <span class="hljs-keyword">else</span> {
+        sendValue(<span class="hljs-literal">null</span>, callback);
+    }
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-19">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-19">&#182;</a>
+              </div>
+              <p>In the same situation as with <code>droppingAfter</code>,
+at other times, we want the more recent values
+to take precedence over the values already in 
+the queue. In this case, we want to expire the
+old values and replace them with new values.
+That is what <code>expiringAfter</code> does.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>
+Channel.prototype.expiringAfter = <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-params">(N)</span> {</span>
+    <span class="hljs-keyword">var</span> ch = <span class="hljs-built_in">Object</span>.create(<span class="hljs-keyword">this</span>);
+    ch._channel = <span class="hljs-keyword">this</span>;
+    ch._bufferLength = N;
+    ch.put = expiringPut;
+    <span class="hljs-keyword">return</span> ch;
+};
+
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">expiringPut</span><span class="hljs-params">(value, callback)</span> {</span>
+    <span class="hljs-keyword">while</span> (<span class="hljs-keyword">this</span>.backlog &gt; <span class="hljs-keyword">this</span>._bufferLength) {
+        <span class="hljs-keyword">this</span>.take();
+    }
+    <span class="hljs-keyword">this</span>._channel.put(value, callback);
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>;
+}
+
+module.exports = Channel;</pre></div></div>
+            
+        </li>
+        
+    </ul>
+  </div>
+</body>
+</html>

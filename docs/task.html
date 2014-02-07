@@ -1,0 +1,1131 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+  <title>Macro `task`</title>
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, target-densitydpi=160dpi, initial-scale=1.0; maximum-scale=1.0; user-scalable=0;">
+  <link rel="stylesheet" media="all" href="docco.css" />
+</head>
+<body>
+  <div id="container">
+    <div id="background"></div>
+    
+      <ul id="jump_to">
+        <li>
+          <a class="large" href="javascript:void(0);">Jump To &hellip;</a>
+          <a class="small" href="javascript:void(0);">+</a>
+          <div id="jump_wrapper">
+          <div id="jump_page">
+            
+              
+              <a class="source" href="channel.html">
+                channel.js
+              </a>
+            
+              
+              <a class="source" href="state_machine.html">
+                state_machine.js
+              </a>
+            
+              
+              <a class="source" href="task.html">
+                task.js
+              </a>
+            
+          </div>
+        </li>
+      </ul>
+    
+    <ul class="sections">
+        
+        
+        
+        <li id="section-1">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-1">&#182;</a>
+              </div>
+              <h1 id="macro-task-">Macro <code>task</code></h1>
+<p><code>task</code> is a macro that takes a body that describes a sequence of asynchronous
+operations and expands it to a state machine with very little runtime overhead.
+It is designed so that it can be used with functions that obey the NodeJS style
+callback convention where a callback function of the form <code>function (err, result) { ... }</code> 
+is passed as the last argument of async calls. A “task” is itself such a function.</p>
+<p>In general, a compiled task looks like a function of the form -</p>
+<pre><code><span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-params">(arg1, arg2, ... , callback)</span> {</span>
+    ... state machine code ...
+}
+</code></pre><p>The macro supports the following four forms to provide easy expression of
+pure no-argument scripts and named tasks.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>
+macro task {</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-2">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-2">&#182;</a>
+              </div>
+              <ol>
+<li><code>task { body ... }</code> produces a <code>function (callback) { ... }</code> expression</li>
+<li><code>task name { body ... }</code> produces a <code>function name(callback) { ... }</code> declaration.</li>
+<li><code>task (arg1, arg2) { body ... }</code> produces a <code>function (arg1, arg2, callback) { ... }</code> expression.</li>
+<li><code>task name(arg1, arg2) { body ... }</code> produces a <code>function name(arg1, arg2, callback) { ... }</code> declaration.</li>
+</ol>
+<p>The <code>task</code> macro goes hand-in-hand with the <code>Channel</code> and <code>StateMachine</code> modules.
+While the <code>StateMachine</code> module is internal and the macro user doesn’t need to 
+bother about it, the <code>Channel</code> module offers a simple way to coordinate multi-tasking
+in JS - in the CSP style of the <code>Haskell</code>, <code>Erlang</code> and <code>Go</code> languages.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>
+    case { $_ { $body ... } } =&gt; {
+        letstx $callback = [makeIdent("callback", #{$_})];
+        return #{ 
+            (function () {
+                setup_state_machine $_ $callback ($callback) { $body ... }
+            })
+        };
+    }
+
+    case { $_ $taskname:ident { $body ... } } =&gt; {
+        letstx $callback = [makeIdent("callback", #{$_})];
+        return #{ 
+            function $taskname() {
+                setup_state_machine $_ $callback ($callback) { $body ... }
+            }
+        };
+    }
+
+    case { $_ ($x:ident (,) ...) { $body ... } } =&gt; {
+        letstx $callback = [makeIdent("callback", #{$_})];
+        return #{
+            (function ($x (,) ... , $callback) {
+                setup_state_machine $_ $callback ($x (,) ... , $callback) { $body ... }
+            })
+        };
+    }
+
+    case { $_ $taskname:ident($x:ident (,) ...) { $body ... } } =&gt; {
+        letstx $callback = [makeIdent("callback", #{$_})];
+        return #{
+            function $taskname($x (,) ... , $callback) {
+                setup_state_machine $_ $callback ($x (,) ... , $callback) { $body ... }
+            }
+        };
+    }                  
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-3">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-3">&#182;</a>
+              </div>
+              <p>A “task” consists of a sequence of “statements” separated by “;”.  Each
+statement may be a synchronous action or an asynchronous one, but all
+statements are treated the same by <code>task</code>, by inserting an async step
+between them. The following control structures are also supported -</p>
+<ol>
+<li><code>if { ... }</code> and <code>if { ... } else { ... }</code></li>
+<li><code>while (...) { ... }</code></li>
+<li><code>for (...;...;...) { ... }</code></li>
+<li><code>catch (ErrorClass e) { ... }</code></li>
+<li><code>catch (e) { ... }</code></li>
+<li><code>finally { ... }</code></li>
+<li><code>finally func(args ...);</code></li>
+<li><code>switch (val) { case v1: { } case v2,v3,v4: { } case v5: { } ... }</code></li>
+<li><code>throw expr;</code></li>
+<li><code>return expr1 , expr2 , ... ;</code></li>
+</ol>
+<p>There is no separate <code>try</code> statement supported since in my experience
+code that requires a local try-catch within a function almost always
+has a bad design decision in it regarding error management, and/or
+could easily be refactored to make the error concerns clearer. Also,
+syntactically, placing the error handling code encourages postponing
+thinking about error conditions whereas putting catch clauses up front
+forces thinking about them early on .. and close to the code that is
+actually relevant. For example, it is much clearer to state 
+“begin a transaction now, if there is any error later on, rollback
+the transaction.” which is expressed with this approach as -</p>
+<pre><code> <span class="hljs-keyword">var</span> tx = db.begin();
+ <span class="hljs-keyword">catch</span> (e) {
+     tx.rollback();
+ }
+ ..<span class="hljs-number">.256</span> lines of code that can fail...
+</code></pre><p>as opposed to the traditional -</p>
+<pre><code> <span class="hljs-keyword">var</span> tx = db.begin();
+ <span class="hljs-keyword">try</span> {
+     ..<span class="hljs-number">.256</span> lines of code that can fail...
+ } <span class="hljs-keyword">catch</span> (e) {
+     tx.rollback();
+     <span class="hljs-keyword">throw</span> e;
+ }
+</code></pre><p>Note: While there is a <code>throw e</code> in the traditional code above,
+there is none in the <code>catch</code> clause within a <code>task</code>. This is because
+if a catch clause doesn’t “handle” the error, it automatically gets 
+rethrown. “Handling” an error amounts to <code>return</code>ing without an error
+from within a <code>catch</code> clause.</p>
+<p>The following statement forms are supported within the task body as
+well as within the bodies of the above control structures -</p>
+<ol>
+<li><p><code>var x = expr1, y = expr2, ... ;</code> This is interpreted as declaration
+and initialization of state variables. The initialization part is not
+optional.</p>
+</li>
+<li><p><code>x, y, z &lt;- blah[42].bling().asyncMethod(arg1, arg2);</code> will insert an
+additional <code>callback</code> argument to the method (or function) invocation,
+collect the results passed to the callback of the form 
+<code>function (err, x, y, z) { ... }</code> and assign them to the state variables
+<code>x</code>, <code>y</code> and <code>z</code>.</p>
+</li>
+<li><p><code>&lt;- blah[42].bling().asyncMethod(arg1, arg2);</code> will insert a callback
+function of the form <code>function (err) { ... }</code> - i.e. no result value
+is expected of the callback. To make this form clearer, you can also
+use <code>await</code> instead of the leading <code>&lt;-</code>.</p>
+</li>
+<li><p><code>x &lt;- chan EXPR;</code> expects the expression <code>EXPR</code> to evaluate to a
+<code>Channel</code> object (see <code>channel.js</code>). <code>x</code> will be assigned to the 
+value produced by the channel when <code>.take()</code> is called on it.
+This is a simpler syntax for <code>var ch = EXPR; x &lt;- ch.take();</code></p>
+</li>
+</ol>
+<p>All other statements separated by “;” are treated as synchronous and
+passed through the macro as is.</p>
+<p>If you want to work with concurrently executing tasks, use channels
+to coordinate them. Notable, <code>Channel.merge([ch1, ch2, ...])</code> 
+will make a channel into which all the given channels will be setup
+to pipe their results. The merged channel will yield <code>{chan: ch, val: value}</code>
+objects so that you can do different things based on the channel that
+produced the value.</p>
+
+            </div>
+            
+        </li>
+        
+        
+        <li id="section-4">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-4">&#182;</a>
+              </div>
+              <h2 id="setting-up-the-state-machine">Setting up the state machine</h2>
+<p>To setup a state machine, we scan the body to find the machine’s state
+variables and declare them up front. This simplifies the need for 
+local var declarations in the generated JS … which are not really
+local anyway.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>
+macro setup_state_machine {
+    rule { $task $callback $formals { $body ... } } =&gt; {
+        <span class="hljs-keyword">var</span> StateMachine = <span class="hljs-built_in">arguments</span>.callee.StateMachine || (<span class="hljs-built_in">arguments</span>.callee.StateMachine = <span class="hljs-built_in">require</span>(<span class="hljs-string">'state_machine'</span>));
+        <span class="hljs-keyword">var</span> state_machine;
+        declare_state_variables $task ($callback) { $body ... } 
+        declare_state_arguments $formals ;
+        <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">state_machine_fn</span><span class="hljs-params">(err)</span> {</span>
+            <span class="hljs-keyword">if</span> (err &amp;&amp; !state_machine.state.isUnwinding) { <span class="hljs-keyword">return</span> state_machine.callback(err); }
+            <span class="hljs-keyword">try</span> {
+                <span class="hljs-keyword">switch</span> (state_machine.state.id) {
+                    <span class="hljs-keyword">case</span> <span class="hljs-number">1</span>:</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-5">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-5">&#182;</a>
+              </div>
+              <p><code>step_state</code> is the real work horse, which
+walks through each statement in the task
+body and compiles it to a single step in
+the state machine.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>                        step_state $task state_machine <span class="hljs-number">1</span> { $body ... }
+                }
+            } <span class="hljs-keyword">catch</span> (e) {
+                state_machine.callback(e);
+            }
+        }
+        state_machine = <span class="hljs-keyword">new</span> StateMachine(<span class="hljs-keyword">this</span>, $callback, state_machine_fn);
+        state_machine.start();
+        <span class="hljs-keyword">return</span> state_machine.controlAPIMaker;
+    }
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-6">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-6">&#182;</a>
+              </div>
+              <h2 id="declaring-state-variables">Declaring state variables</h2>
+<p>To do this, we scan the code and collect all the state variable identifiers
+into a pseudo list syntax that looks like <code>(x y z ...)</code>. The <code>$vars</code> argument
+to the <code>declare_state_variables</code> macro is expected to match this.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>
+macro declare_state_variables {
+    rule { $task $vars { <span class="hljs-keyword">if</span> ($x ...) { $then ... } <span class="hljs-keyword">else</span> { $<span class="hljs-keyword">else</span> ... } $rest ... } } =&gt; {
+        declare_state_variables $task $vars { $then ... $<span class="hljs-keyword">else</span> ... $rest ... }
+    }
+    rule { $task $vars { <span class="hljs-keyword">if</span> ($x ...) { $then ... }  $rest ... } } =&gt; {
+        declare_state_variables $task $vars { $then ... $rest ... }
+    }</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-7">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-7">&#182;</a>
+              </div>
+              <p>Rewrite for loops using while.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>    rule { $task $vars { <span class="hljs-keyword">for</span> ($init ... ; $cond ... ; $next ...) { $body ... }  $rest ... } } =&gt; {
+        declare_state_variables $task $vars { $init ... ; <span class="hljs-keyword">while</span> ($cond ...) { $body ... $next ... ; } $rest ... }
+    }
+    rule { $task $vars { <span class="hljs-keyword">while</span> ($x ...) { $body ... }  $rest ... } } =&gt; {
+        declare_state_variables $task $vars { $body ... $rest ... }
+    }
+    rule { $task $vars { <span class="hljs-keyword">finally</span> $cleanup ... ($args:expr (,) ...) ; $rest ... } } =&gt; {
+        declare_state_variables $task $vars { $rest ... }
+    }
+    rule { $task $vars { <span class="hljs-keyword">finally</span> { $cleanup ... } $rest ... } } =&gt; {
+        declare_state_variables $task $vars { $cleanup ... $rest ... }
+    }
+    rule { $task $vars { <span class="hljs-keyword">catch</span> ($eclass:ident $e:ident) { $handler ... } $rest ... } } =&gt; {
+        declare_state_variables $task $vars { <span class="hljs-keyword">var</span> $e = <span class="hljs-literal">null</span> ; $handler ... $rest ... }
+    }
+    rule { $task $vars { <span class="hljs-keyword">catch</span> ($e:ident) { $handler ... } $rest ... } } =&gt; {
+        declare_state_variables $task $vars { <span class="hljs-keyword">var</span> $e = <span class="hljs-literal">null</span> ; $handler ... $rest ... }
+    }
+    rule { $task $vars { <span class="hljs-keyword">switch</span> ($x ...) { $(<span class="hljs-keyword">case</span> $ix:lit : { $body ... }) ... } $rest ... } } =&gt; {
+        declare_state_variables $task $vars { $($body ...) ... $rest ... }
+    }
+    rule { $task $vars { $step ... ; $rest ... } } =&gt; {
+        declare_state_variables_step $task $vars { $step ... ; } { $rest ... }
+    }
+    rule { $task $vars { } } =&gt; { 
+        declare_unique_varset $task $vars ;
+    }
+    rule { $task () { } } =&gt; { 
+    }
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-8">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-8">&#182;</a>
+              </div>
+              <p>After scanning the entire body, we uniquify the variable set because
+the body may contain multiple declarations of the same variable and
+we don’t want to pollute the generated code with repeated var declarations
+as much as we can.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>
+macro declare_unique_varset {
+	<span class="hljs-keyword">case</span> { _ $task ($v ...) } =&gt; {
+		<span class="hljs-keyword">var</span> vars = #{$v ...};
+		<span class="hljs-keyword">var</span> varnames = vars.map(unwrapSyntax);
+		<span class="hljs-keyword">var</span> uniqvarnames = {};
+		varnames.forEach(<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-params">(v)</span> {</span> uniqvarnames[<span class="hljs-string">'%'</span> + v] = <span class="hljs-literal">true</span>; });
+		letstx $uvars ... = <span class="hljs-built_in">Object</span>.keys(uniqvarnames).map(<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-params">(v)</span> {</span> <span class="hljs-keyword">return</span> makeIdent(v.substring(<span class="hljs-number">1</span>), #{$task}); });
+		<span class="hljs-keyword">return</span> #{ declare_varset $task ($uvars ...) ; };
+	}
+}
+
+macro declare_varset {
+	rule { $task ($v ...) ; } =&gt; {
+		<span class="hljs-keyword">var</span> $v (,) ... ;
+	}
+}
+
+macro declare_state_variables_step {
+	rule { $task ($v ...) { $x:ident &lt;- $y ... ; } { $rest ... } } =&gt; {
+		declare_state_variables $task ($x $v ...) { $rest ... }
+	}
+	rule { $task ($v ...) { $x:ident (,) ... &lt;- $y ... ; } { $rest ... } } =&gt; {
+		declare_state_variables $task ($x ... $v ...) { $rest ... }
+	}
+	rule { $task ($v ...) { <span class="hljs-keyword">var</span> $($x:ident = $y:expr) (,) ... ; } { $rest ... } } =&gt; {
+		declare_state_variables $task ($x ... $v ...) { $rest ... }
+	}
+	rule { $task $vs { $x ... ; } { $rest ... } } =&gt; {
+		declare_state_variables $task $vs { $rest ... }
+	}
+}
+
+macro declare_state_arguments {
+	rule { ($x:ident (,) ...) } =&gt; {
+		<span class="hljs-keyword">var</span> argi = <span class="hljs-number">0</span>, $($x = <span class="hljs-built_in">arguments</span>[argi++]) (,) ...;
+	}
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-9">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-9">&#182;</a>
+              </div>
+              <h2 id="compiling-the-steps-of-the-state-machine">Compiling the steps of the state machine</h2>
+<p>The <code>step_state</code> macro extracts the relevant bit of code to be compiled into
+a “step” and passes it over to the <code>step_state_line</code> macro. This extra layer
+is useful since not all of the syntax in the body of a task are separated by
+“;” markers. The control structures <code>if</code>, <code>while</code>, <code>finally</code> and <code>catch</code> do
+not use “;” as separators to keep the code body of a task looking as close
+to traditional javascript as possible.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>
+macro step_state {
+    rule { $task $state_machine $id { <span class="hljs-keyword">if</span> ($x ...) { $then ... } <span class="hljs-keyword">else</span> { $<span class="hljs-keyword">else</span> ... } $rest ... } } =&gt; {
+        step_state_line $task $state_machine $id { <span class="hljs-keyword">if</span> ($x ...) { $then ... } <span class="hljs-keyword">else</span> { $<span class="hljs-keyword">else</span> ... } } { $rest ... }
+    }
+    rule { $task $state_machine $id { <span class="hljs-keyword">if</span> ($x ...) { $then ... }  $rest ... } } =&gt; {
+        step_state_line $task $state_machine $id { <span class="hljs-keyword">if</span> ($x ...) { $then ... } } { $rest ... }
+    }</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-10">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-10">&#182;</a>
+              </div>
+              <p>Rewrite for loops using while.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>    rule { $task $state_machine $id { <span class="hljs-keyword">for</span> ($init ... ; $cond ... ; $next ...) { $body ... }  $rest ... } } =&gt; {
+        step_state $task $state_machine $id { $init ... ; <span class="hljs-keyword">while</span> ($cond ...) { $body ... $next ... ; } $rest ... }
+    }
+    rule { $task $state_machine $id { <span class="hljs-keyword">while</span> ($x ...) { $body ... }  $rest ... } } =&gt; {
+        step_state_line $task $state_machine $id { <span class="hljs-keyword">while</span> ($x ...) { $body ... } } { $rest ... }
+    }
+    rule { $task $state_machine $id { <span class="hljs-keyword">finally</span> $cleanup ... ($args:expr (,) ...) ;  $rest ... } } =&gt; {
+        step_state_line $task $state_machine $id { <span class="hljs-keyword">finally</span> $cleanup ... ($args (,) ...) ; } { $rest ... }
+    }
+    rule { $task $state_machine $id { <span class="hljs-keyword">finally</span> { $cleanup ... }  $rest ... } } =&gt; {
+        step_state_line $task $state_machine $id { <span class="hljs-keyword">finally</span> { $cleanup ... } } { $rest ... }
+    }
+    rule { $task $state_machine $id { <span class="hljs-keyword">catch</span> ($x ...) { $handler ... }  $rest ... } } =&gt; {
+        step_state_line $task $state_machine $id { <span class="hljs-keyword">catch</span> ($x ...) { $handler ... } } { $rest ... }
+    }
+    rule { $task $state_machine $id { <span class="hljs-keyword">switch</span> ($x:expr) { $b ... } $rest ... } } =&gt; {
+        step_state_line $task $state_machine $id { <span class="hljs-keyword">switch</span> ($x) { $b ... } } { $rest ... }
+    }
+    rule { $task $state_machine $id { $step ... ; $rest ... } } =&gt; {
+        step_state_line $task $state_machine $id { $step ... ; } { $rest ... }
+    }
+    rule { $task $state_machine $id { } } =&gt; {
+        $state_machine.callback(<span class="hljs-literal">null</span>, <span class="hljs-literal">true</span>);
+        <span class="hljs-keyword">break</span>;
+    }
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-11">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-11">&#182;</a>
+              </div>
+              <h2 id="counting-states">Counting states</h2>
+<p>For the control structures that perform branching to different parts of the code,
+we need to be able to determine the state ids of the branch and merge statements.
+<code>count_states</code> will count the number of states added by a given block of statements,
+including control structures, so that the jump ahead positions can be determined
+during compilation.</p>
+<p>The second argument to <code>count_states</code> is a pseudo list of the form <code>(m n ...)</code> 
+where <code>m</code>, <code>n</code> are plain integers. The list is summed up at the end by <code>sumpup_counts</code> 
+to produce the final count.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>
+macro count_states {
+    rule { $task ($n ...) { <span class="hljs-keyword">if</span> ($x ...) { $then ... } <span class="hljs-keyword">else</span> { $<span class="hljs-keyword">else</span> ... } $rest ... } } =&gt; {
+        count_states $task (<span class="hljs-number">2</span> $n ...) { $then ... $<span class="hljs-keyword">else</span> ... $rest ... }
+    }
+    rule { $task ($n ...) { <span class="hljs-keyword">if</span> ($x ...) { $then ... } $rest ... } } =&gt; {
+        count_states $task (<span class="hljs-number">1</span> $n ...) { $then ... $rest ... }
+    }</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-12">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-12">&#182;</a>
+              </div>
+              <p>Rewrite for loops using while.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>    rule { $task $n { <span class="hljs-keyword">for</span> ($init ... ; $cond ... ; $next ...) { $body ... } $rest ... } } =&gt; {
+        count_states $task $n { $init ... ; <span class="hljs-keyword">while</span> ($cond ...) { $body ... $next ... ; } $rest ... }
+    }
+    rule { $task ($n ...) { <span class="hljs-keyword">while</span> ($x ...) { $body ... } $rest ... } } =&gt; {
+        count_states $task (<span class="hljs-number">2</span> $n ...) { $body ... $rest ... }
+    }
+    rule { $task ($n ...) { <span class="hljs-keyword">finally</span> $cleanup ... ($args:expr (,) ...) ; $rest ... } } =&gt; {
+        count_states $task (<span class="hljs-number">1</span> $n ...) { $rest ... }
+    }
+    rule { $task ($n ...) { <span class="hljs-keyword">finally</span> { $cleanup ... } $rest ... } } =&gt; {
+        count_states $task (<span class="hljs-number">2</span> $n ...) { $cleanup ... $rest ... }
+    }
+    rule { $task ($n ...) { <span class="hljs-keyword">catch</span> ($e ...) { $handler ... } $rest ... } } =&gt; {
+        count_states $task (<span class="hljs-number">2</span> $n ...) { $handler ... $rest ... }
+    }
+    rule { $task $n { <span class="hljs-keyword">switch</span> ($x ...) { $(<span class="hljs-keyword">case</span> $ix:lit : { $body ... }) ... } $rest ... } } =&gt; {
+        count_states $task (<span class="hljs-number">1</span> $n) { $($body ... phi $state_machine ;) ... $rest ... }
+    }
+    rule { $task ($n ...) { $step ... ; $rest ... } } =&gt; {
+        count_states $task (<span class="hljs-number">1</span> $n ...) { $rest ... }
+    }
+    rule { $task ($n ...) { } } =&gt; { 
+        sumup_counts ($n ...)
+    }
+}
+
+macro sumup_counts {
+    <span class="hljs-keyword">case</span> { $_ ($n ...) } =&gt; {
+        <span class="hljs-keyword">var</span> sum = #{$n ...}.map(unwrapSyntax).reduce(<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-params">(a,b)</span> {</span> <span class="hljs-keyword">return</span> a + b; });
+        letstx $sum = [makeValue(sum, #{$_})];
+        <span class="hljs-keyword">return</span> #{$sum};
+    }
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-13">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-13">&#182;</a>
+              </div>
+              <h2 id="step_state_line">step_state_line</h2>
+<p>This is the real work horse which walks through each statement and compiles
+it into an asynchronous step in the state machine.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>
+macro step_state_line {</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-14">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-14">&#182;</a>
+              </div>
+              <h3 id="await">await</h3>
+<p>The <code>await func(args...);</code> clause is a synonym for <code>&lt;- func(args...);</code>.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>    <span class="hljs-keyword">case</span> { $me $task $state_machine $id { await $y ... (); } { $rest ... } } =&gt; {
+        <span class="hljs-keyword">var</span> id = unwrapSyntax(#{$id});
+        letstx $id2 = [makeValue(id + <span class="hljs-number">1</span>, #{$id})];
+        <span class="hljs-keyword">return</span> #{
+            $y ... ($state_machine.thenTo($id2));
+            <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> $id2:
+            step_state $task $state_machine $id2 { $rest ... }
+        };
+    }
+
+    <span class="hljs-keyword">case</span> { $me $task $state_machine $id { await $y ... ($args:expr (,) ...); } { $rest ... } } =&gt; {
+        <span class="hljs-keyword">var</span> id = unwrapSyntax(#{$id});
+        letstx $id2 = [makeValue(id + <span class="hljs-number">1</span>, #{$id})];
+        <span class="hljs-keyword">return</span> #{
+            $y ... ($args (,) ... , $state_machine.thenTo($id2));
+            <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> $id2:
+            step_state $task $state_machine $id2 { $rest ... }
+        };
+    }</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-15">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-15">&#182;</a>
+              </div>
+              <h3 id="taking-values-from-channels">Taking values from channels</h3>
+<p>If you have functions that return channels on which they will produce their results,
+then you can use this expression as syntax sugar to get the value out of the returned
+channel.</p>
+<pre><code> val &lt;- chan someProcess(arg1, arg1);
+</code></pre>
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>
+    <span class="hljs-keyword">case</span> { $me $task $state_machine $id { $x:ident (,) ... &lt;- chan $y ... ; } { $rest ... } } =&gt; {
+        <span class="hljs-keyword">var</span> id = unwrapSyntax(#{$id});
+        letstx $id2 = [makeValue(id + <span class="hljs-number">1</span>, #{$id})];</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-16">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-16">&#182;</a>
+              </div>
+              <p>In this form (ex: z &lt;- chan blah[32].bling(); ), the expression is expected to
+produce a channel, from which a value will be taken. </p>
+<p>Type detection is done by looking for a <code>take</code> method, so any object that
+has the same <code>take</code> protocol as a channel can be used.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>        <span class="hljs-keyword">return</span> #{
+            <span class="hljs-keyword">var</span> tmp1 = $y ...;
+            <span class="hljs-keyword">if</span> (tmp1 &amp;&amp; tmp1.take) {
+                tmp1.take($state_machine.thenTo($id2));
+            } <span class="hljs-keyword">else</span> {
+                <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-built_in">Error</span>(<span class="hljs-string">'Expected a channel in step '</span> + $id);
+            }
+            <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> $id2:
+            <span class="hljs-keyword">var</span> i = <span class="hljs-number">1</span>;
+            $($x = <span class="hljs-built_in">arguments</span>[i++];) ...
+                step_state $task $state_machine $id2 { $rest ... }
+        };
+    }</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-17">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-17">&#182;</a>
+              </div>
+              <h3 id="retrieving-values">Retrieving values</h3>
+<p>Values are retrieved from async steps using the <code>&lt;-</code> clause of the form -</p>
+<pre><code> x, y, z &lt;- coll[<span class="hljs-number">42</span>].thing.asyncMethod(arg1, arg2);
+</code></pre><p>This block and the following are basically the same. The problem is that I don’t know
+how to insert the additional callback argument with a preceding comma in one
+case and without one in the other.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>    <span class="hljs-keyword">case</span> { $me $task $state_machine $id { $x:ident (,) ... &lt;- $y ... (); } { $rest ... } } =&gt; {
+        <span class="hljs-keyword">var</span> id = unwrapSyntax(#{$id});
+        letstx $id2 = [makeValue(id + <span class="hljs-number">1</span>, #{$id})];
+        <span class="hljs-keyword">return</span> #{
+            $y ... ($state_machine.thenTo($id2));
+            <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> $id2:
+            <span class="hljs-keyword">var</span> i = <span class="hljs-number">1</span>;
+            $($x = <span class="hljs-built_in">arguments</span>[i++];) ...
+                step_state $task $state_machine $id2 { $rest ... }
+        };
+    }
+
+    <span class="hljs-keyword">case</span> { $me $task $state_machine $id { $x:ident (,) ... &lt;- $y ... ($args:expr (,) ...); } { $rest ... } } =&gt; {
+        <span class="hljs-keyword">var</span> id = unwrapSyntax(#{$id});
+        letstx $id2 = [makeValue(id + <span class="hljs-number">1</span>, #{$id})];
+        <span class="hljs-keyword">return</span> #{
+            $y ... ($args (,) ... , $state_machine.thenTo($id2));
+            <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> $id2:
+            <span class="hljs-keyword">var</span> i = <span class="hljs-number">1</span>;
+            $($x = <span class="hljs-built_in">arguments</span>[i++];) ...
+                step_state $task $state_machine $id2 { $rest ... }
+        };
+    }</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-18">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-18">&#182;</a>
+              </div>
+              <h3 id="multi-tasking">Multi-tasking</h3>
+<p><code>switch (expr) { case 0: { ... } case 1: { ... }}</code> can be used to manage
+coordination of multiple tasks. The <code>expr</code> is an expression whose value
+is matched with the case literals to decide where to branch.  You can,
+for example, branch based on the object yielded by a merged channel by
+looking at the ‘ix’ property of the object. The <code>case</code> blocks don’t 
+need any break statements and won’t bleed from one to the next.</p>
+<p>There MUST be one <code>case</code> clause for each channel in the merge list, or
+an error will be raised at runtime.</p>
+<p>You’d use <code>switch</code> like this -</p>
+<pre><code> mch = Channel.merge([ch1, ch2, ... chN]); <span class="hljs-comment">// Or any equivalent thing to get `x`.</span>
+ <span class="hljs-keyword">while</span> (<span class="hljs-literal">true</span>) {
+     x &lt;- chan mch;
+     <span class="hljs-keyword">switch</span> (x.ix) {
+         <span class="hljs-keyword">case</span> <span class="hljs-number">0</span>: { ... x.val ... }
+         <span class="hljs-keyword">case</span> <span class="hljs-number">1</span>: { ... x.val ... }
+     }
+ }
+</code></pre><p>i.e., for the most part <code>switch</code> works like normal in Javascript, except
+that <code>break;</code> statements are not needed, and an exception is raised if
+an unhandled case occurs at runtime.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>
+    <span class="hljs-keyword">case</span> { $me $task $state_machine $id { <span class="hljs-keyword">switch</span> ($c:expr) { $(<span class="hljs-keyword">case</span> $ix:lit (,) ... : { $body ... }) ... } } { $rest ... } } =&gt; {
+        <span class="hljs-keyword">var</span> id = unwrapSyntax(#{$id});
+        letstx $id2 = [makeValue(id + <span class="hljs-number">1</span>, #{$id})];
+        <span class="hljs-keyword">return</span> #{
+            <span class="hljs-keyword">var</span> tmp1;
+            <span class="hljs-keyword">if</span> (!(tmp1 = $state_machine.jumpTable($id))) {
+                tmp1 = $state_machine.jumpTable($id, [$([$ix (,) ...]) (,) ...], [$((count_states $task (<span class="hljs-number">0</span>) { $body ... })) (,) ...]);
+            }
+            tmp1.jumpToCase($c);
+            <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> $id2:
+            step_state $task $state_machine $id {
+                $($body ... phi $state_machine ;) ...
+                    $rest ...
+            }
+        };
+    }</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-19">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-19">&#182;</a>
+              </div>
+              <h3 id="branching-on-conditions">Branching on conditions</h3>
+<p><code>if { ... } else { ... }</code> blocks work as expected in normal javascript, except that
+async statements can also be used within them.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>
+    <span class="hljs-keyword">case</span> { $me $task $state_machine $id { <span class="hljs-keyword">if</span> ($x:expr) { $then ... } <span class="hljs-keyword">else</span> { $<span class="hljs-keyword">else</span> ... } } { $rest ... } } =&gt; {
+        <span class="hljs-keyword">var</span> id = unwrapSyntax(#{$id});
+        letstx $id2 = [makeValue(id + <span class="hljs-number">1</span>, #{$id})];
+        <span class="hljs-keyword">return</span> #{
+            <span class="hljs-keyword">var</span> jumpThen = count_states $task (<span class="hljs-number">0</span>) { $then ... };
+            <span class="hljs-keyword">var</span> jumpElse = count_states $task (<span class="hljs-number">0</span>) { $<span class="hljs-keyword">else</span> ... };
+            <span class="hljs-keyword">if</span> ($x) {
+                $state_machine.pushPhi($id2 + <span class="hljs-number">1</span> + jumpThen + jumpElse);
+            } <span class="hljs-keyword">else</span> {
+                $state_machine.goTo($id2 + <span class="hljs-number">1</span> + jumpThen);
+                <span class="hljs-keyword">break</span>;
+            }
+            <span class="hljs-keyword">case</span> $id2:
+            step_state $task $state_machine $id2 { $then ... phi $state_machine ; $<span class="hljs-keyword">else</span> ... ; $rest ... }
+        };
+    }
+
+    <span class="hljs-keyword">case</span> { $me $task $state_machine $id { <span class="hljs-keyword">if</span> ($x:expr) { $then ... } } { $rest ... } } =&gt; {
+        <span class="hljs-keyword">var</span> id = unwrapSyntax(#{$id});
+        letstx $id2 = [makeValue(id + <span class="hljs-number">1</span>, #{$id})];
+        <span class="hljs-keyword">return</span> #{
+            <span class="hljs-keyword">var</span> jump = count_states $task (<span class="hljs-number">0</span>) { $then ... };
+            <span class="hljs-keyword">if</span> (!($x)) {
+                $state_machine.goTo($id2 + jump);
+                <span class="hljs-keyword">break</span>;
+            }
+            <span class="hljs-keyword">case</span> $id2:
+            step_state $task $state_machine $id2 { $then ... $rest ... }
+        };
+    }</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-20">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-20">&#182;</a>
+              </div>
+              <h3 id="looping-using-while-">Looping using <code>while</code></h3>
+<p>The usual <code>while (cond) { body... }</code> is supported as well, except that there is no
+`break;’ statement support.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>
+    <span class="hljs-keyword">case</span> { $me $task $state_machine $id { <span class="hljs-keyword">while</span> ($x:expr) { $body ... } } { $rest ... } } =&gt; {
+        <span class="hljs-keyword">var</span> id = unwrapSyntax(#{$id});
+        letstx $id2 = [makeValue(id + <span class="hljs-number">1</span>, #{$id})];
+        <span class="hljs-keyword">return</span> #{
+            <span class="hljs-keyword">var</span> jumpBody = count_states $task (<span class="hljs-number">0</span>) { $body ... };
+            <span class="hljs-keyword">if</span> ($x) {
+                $state_machine.pushPhi($id);
+            } <span class="hljs-keyword">else</span> {
+                $state_machine.goTo($id2 + <span class="hljs-number">1</span> + jumpBody);
+                <span class="hljs-keyword">break</span>;
+            }
+            <span class="hljs-keyword">case</span> $id2:
+            step_state $task $state_machine $id2 { $body ... phi $state_machine ; $rest ... }
+        };
+    }</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-21">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-21">&#182;</a>
+              </div>
+              <h3 id="exception-mechanism">Exception mechanism</h3>
+<p>Error handling inside tasks uses a different and more expressive form of
+exceptions. There is no <code>try</code> clause since any statement may throw an exception
+that will be forwarded to the callback provided to the task.</p>
+<p><code>finally</code> statements/blocks can be placed anywhere and will register
+actions to be executed before a) reaching the catch clause immediately
+above or b) returning from the task normally. These statements/blocks execute
+in the order opposite to the order in which they were encountered during running.
+If these occur within a loop, then the statements/blocks will execute as many
+times as the loop did. (So be aware of what you want to be cleaned up.)</p>
+
+            </div>
+            
+        </li>
+        
+        
+        <li id="section-22">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-22">&#182;</a>
+              </div>
+              <p><code>finally funcExpr(args...);</code> statement causes the <code>funcExpr</code> and <code>args...</code> to be evaluated
+at the time the statement is encountered, but defers the call itself to be made at unwinding
+time.</p>
+<p>TODO: Support method calls as well.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>    
+    <span class="hljs-keyword">case</span> { $me $task $state_machine $id { <span class="hljs-keyword">finally</span> $cleanup ... ($arg:expr (,) ...) ; } { $rest ... } } =&gt; {
+        <span class="hljs-keyword">var</span> id = unwrapSyntax(#{$id});
+        letstx $id2 = [makeValue(id + <span class="hljs-number">1</span>, #{$id})];
+        <span class="hljs-comment">/* Evaluate the arguments right now, but call the cleanup function later. */</span>
+        <span class="hljs-keyword">return</span> #{
+            $state_machine.pushCleanupAction($cleanup ... , [$arg (,) ...]);
+            <span class="hljs-keyword">case</span> $id2:
+            step_state $task $state_machine $id2 { $rest ... }
+        };
+    }</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-23">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-23">&#182;</a>
+              </div>
+              <p><code>finally { ... }</code> mark blocks of steps to be run at unwinding time.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>
+    <span class="hljs-keyword">case</span> { $me $task $state_machine $id { <span class="hljs-keyword">finally</span> { $cleanup ... } } { $rest ... } } =&gt; {
+        <span class="hljs-keyword">var</span> id = unwrapSyntax(#{$id});
+        letstx $id2 = [makeValue(id + <span class="hljs-number">1</span>, #{$id})];
+        <span class="hljs-keyword">return</span> #{
+            <span class="hljs-keyword">var</span> jumpHandler = count_states $task (<span class="hljs-number">0</span>) { $cleanup ... };
+            $state_machine.pushCleanupStep($id2);
+            $state_machine.goTo($id2 + <span class="hljs-number">1</span> + jumpHandler);
+            <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> $id2:
+            step_state $task $state_machine $id2 { $cleanup ... unwind $state_machine ; $rest ... }
+        };
+    }</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-24">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-24">&#182;</a>
+              </div>
+              <p><code>catch (e) { ... }</code> blocks will catch all exceptions thrown by statements
+that follow the block, bind the error to <code>e</code> and run the sequence of statements
+within the <code>{...}</code>.</p>
+<p><code>catch (ErrorClass e) {...}</code> will catch and handle only those errors <code>e</code> that satisfy
+<code>e instanceof ErrorClass</code>. Other errors propagate up to catch clauses above.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>    
+    <span class="hljs-keyword">case</span> { $me $task $state_machine $id { <span class="hljs-keyword">catch</span> ($eclass:ident $e:ident) { $handler ... } } { $rest ... } } =&gt; {
+        <span class="hljs-keyword">var</span> id = unwrapSyntax(#{$id});
+        letstx $id2 = [makeValue(id + <span class="hljs-number">1</span>, #{$id})];
+        <span class="hljs-keyword">return</span> #{
+            <span class="hljs-keyword">var</span> jumpHandler = count_states $task (<span class="hljs-number">0</span>) { $handler ... };
+            $state_machine.pushErrorStep($id2);
+            $state_machine.goTo($id2 + <span class="hljs-number">1</span> + jumpHandler);
+            <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> $id2:
+            $e = <span class="hljs-built_in">arguments</span>[<span class="hljs-number">0</span>];
+            <span class="hljs-keyword">if</span> (!($e &amp;&amp; $e <span class="hljs-keyword">instanceof</span> $eclass)) {
+                $state_machine.unwindNextTick();
+                <span class="hljs-keyword">break</span>;
+            }
+            step_state $task $state_machine $id2 { $handler ... unwind $state_machine ; $rest ... }
+        };
+    }
+
+    <span class="hljs-keyword">case</span> { $me $task $state_machine $id { <span class="hljs-keyword">catch</span> ($e:ident) { $handler ... } } { $rest ... } } =&gt; {
+        <span class="hljs-keyword">var</span> id = unwrapSyntax(#{$id});
+        letstx $id2 = [makeValue(id + <span class="hljs-number">1</span>, #{$id})];
+        <span class="hljs-keyword">return</span> #{
+            <span class="hljs-keyword">var</span> jumpHandler = count_states $task (<span class="hljs-number">0</span>) { $handler ... };
+            $state_machine.pushErrorStep($id2);
+            $state_machine.goTo($id2 + <span class="hljs-number">1</span> + jumpHandler);
+            <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> $id2:
+            $e = <span class="hljs-built_in">arguments</span>[<span class="hljs-number">0</span>];
+            step_state $task $state_machine $id2 { $handler ... unwind $state_machine ; $rest ... }
+        };
+    }</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-25">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-25">&#182;</a>
+              </div>
+              <h3 id="state-variable-declaration">State variable declaration</h3>
+<p>State variables are shared with expressions in the entire task and can be
+declared anywhere using var statements. Initializers are compulsory.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>
+    <span class="hljs-keyword">case</span> { $me $task $state_machine $id { <span class="hljs-keyword">var</span> $($x:ident = $y:expr) (,) ... ; } { $rest ... } } =&gt; {
+        <span class="hljs-keyword">var</span> id = unwrapSyntax(#{$id});
+        letstx $id2 = [makeValue(id + <span class="hljs-number">1</span>, #{$id})];
+        <span class="hljs-keyword">return</span> #{
+            $($x = $y;) ...
+            <span class="hljs-keyword">case</span> $id2:
+            step_state $task $state_machine $id2 { $rest ... }			
+        };
+    }</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-26">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-26">&#182;</a>
+              </div>
+              <h3 id="returning-values-from-a-task">Returning values from a task</h3>
+<p><code>return x, y, ...;</code> will result in the task winding back up any <code>finally</code>
+actions and then providing the given values to the next task by calling
+the last callback argument to the task. Such a statement will, obviously,
+return from within any block within control structures.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>
+    <span class="hljs-keyword">case</span> { $me $task $state_machine $id { <span class="hljs-keyword">return</span> $x:expr (,) ... ; } { $rest ... } } =&gt; {
+        <span class="hljs-keyword">var</span> id = unwrapSyntax(#{$id});
+        letstx $id2 = [makeValue(id + <span class="hljs-number">1</span>, #{$id})];
+        <span class="hljs-keyword">return</span> #{
+            $state_machine.callback(<span class="hljs-literal">null</span>, $x (,) ...);
+            <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> $id2:
+            step_state $task $state_machine $id2 { $rest ... }			
+        };
+    }</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-27">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-27">&#182;</a>
+              </div>
+              <h3 id="raising-errors">Raising errors</h3>
+<p>The usual <code>throw err;</code> form will cause the error to first bubble up
+the <code>finally</code> actions and the installed <code>catch</code> sequence and if the
+error survives them all, will be passed on to the task’s callback.</p>
+<p>Hack: “throw object.err;” can be used as a short hand for
+“if (object.err) { throw object.err; }”. i.e. the error is thrown
+only if it is not null or undefined or false.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>
+    <span class="hljs-keyword">case</span> { $me $task $state_machine $id { <span class="hljs-keyword">throw</span> $e:expr ; } { $rest ... } } =&gt; {
+        <span class="hljs-keyword">var</span> id = unwrapSyntax(#{$id});
+        letstx $id2 = [makeValue(id + <span class="hljs-number">1</span>, #{$id})];
+        <span class="hljs-keyword">return</span> #{
+            <span class="hljs-keyword">var</span> tmp1 = $e;
+            tmp1 &amp;&amp; $state_machine.callback(tmp1);
+            <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> $id2:
+            step_state $task $state_machine $id2 { $rest ... }			
+        };
+    }</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-28">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-28">&#182;</a>
+              </div>
+              <h2 id="internals">Internals</h2>
+<h3 id="-phi-"><code>phi</code></h3>
+<p>Used to merge states when branching using <code>if</code>, <code>while</code> and <code>switch</code>.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>
+    <span class="hljs-keyword">case</span> { $me $task $state_machine $id { phi $state_machine ; } { $rest ... } } =&gt; {
+        <span class="hljs-keyword">var</span> id = unwrapSyntax(#{$id});
+        letstx $id2 = [makeValue(id + <span class="hljs-number">1</span>, #{$id})];
+        <span class="hljs-keyword">return</span> #{
+            $state_machine.phi();
+            <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> $id2:
+            step_state $task $state_machine $id2 { $rest ... }			
+        };
+    }</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-29">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-29">&#182;</a>
+              </div>
+              <h3 id="-unwind-"><code>unwind</code></h3>
+<p>Used to begin or continue unwinding up the <code>finally</code> and <code>catch</code> sequences.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>
+    <span class="hljs-keyword">case</span> { $me $task $state_machine $id { unwind $state_machine ; } { $rest ... } } =&gt; {
+        <span class="hljs-keyword">var</span> id = unwrapSyntax(#{$id});
+        letstx $id2 = [makeValue(id + <span class="hljs-number">1</span>, #{$id})];
+        <span class="hljs-keyword">return</span> #{
+            $state_machine.unwindNextTick();
+            <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> $id2:
+            step_state $task $state_machine $id2 { $rest ... }			
+        };
+    }</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-30">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-30">&#182;</a>
+              </div>
+              <h3 id="synchronous-statements">Synchronous statements</h3>
+<p>Any statement that doesn’t match the above structures are considered
+to be executed synchronously. While each sync step is given its own id,
+there isn’t an async separation between these steps. The plus side of that
+is that one more event-loop cycle is avoided, but the minus is that we
+lose the otherwise more fine grained multi-tasking we get.</p>
+<p>I may change my mind about whether or not to introduce an additional
+async step, but that decision won’t impact the meaning of the code.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>
+    <span class="hljs-keyword">case</span> { $me $task $state_machine $id { $x ... ; } { $rest ... } } =&gt; {
+        <span class="hljs-keyword">var</span> id = unwrapSyntax(#{$id});
+        letstx $id2 = [makeValue(id + <span class="hljs-number">1</span>, #{$id})];
+        <span class="hljs-keyword">return</span> #{
+            $x ... ;
+            <span class="hljs-keyword">case</span> $id2:
+            step_state $task $state_machine $id2 { $rest ... }
+        };
+    }
+}
+
+export task</pre></div></div>
+            
+        </li>
+        
+    </ul>
+  </div>
+</body>
+</html>
