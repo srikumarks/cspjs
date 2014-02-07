@@ -75,7 +75,8 @@ The caveat is that the code is evolving and performance
 may fluctuate a bit as some features are added. (I'll
 try my best to not compromise.)
 
-Here are some sample results (as of 7 Feb 2014) -
+Here are some sample results (as of 7 Feb 2014, on my
+MacBook Air 1.7GHz Core i5, 4GB RAM, node v0.11.10) -
 
 ### doxbee-sequential
 
