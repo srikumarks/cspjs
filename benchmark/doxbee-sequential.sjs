@@ -38,7 +38,7 @@ task upload(stream, idOrPath, tag) {
     await File.whereUpdate({id: file.id}, {
         version: version.id
     }).execWithin(tx);
-    await tx.commit();
+    tx.commit();
 }
 
 module.exports = upload;
