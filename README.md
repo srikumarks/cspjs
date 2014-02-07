@@ -39,7 +39,7 @@ as the final argument.
 1. Compare [task/doxbee-sequential] and [bluebird/doxbee-sequential] for the
    `doxbee-sequential` benchmark. 
 2. Compare [task/doxbee-sequential-errors] and
-   [bluebird/doxbee-sequential-error] for the `doxbee-sequential-errors`
+   [bluebird/doxbee-sequential-errors] for the `doxbee-sequential-errors`
    benchmark.
 3. Compare [task/madeup-parallel] and [bluebird/madeup-parallel] for the
    `madeup-parallel` benchmark.
