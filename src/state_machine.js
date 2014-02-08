@@ -128,14 +128,14 @@ StateMachine.prototype.unwindNextTick = function () {
     process.nextTick(this.boundUnwind);
 };
 
-StateMachine.prototype.pushCleanupAction = function (fn, args) {
+StateMachine.prototype.pushCleanupAction = function (context, fn, args) {
     var callbackPos = args.length;
     var self = this;
     self.state.unwinding.push({
         cleanup: true,
         fn: function (cb) {
             args[callbackPos] = cb;
-            fn.apply(self.context, args);
+            fn.apply(context, args);
         }
     });
 };

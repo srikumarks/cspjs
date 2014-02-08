@@ -498,12 +498,34 @@ macro step_state_line_while {
 // TODO: Support method calls as well.
 
 macro step_state_line_finally_expr {
+    case { $me $task $state_machine $id { finally $cleanup ... . $methId:ident ($arg:expr (,) ...) ; } { $rest ... } } => {
+        var id = unwrapSyntax(#{$id});
+        letstx $id2 = [makeValue(id + 1, #{$id})];
+        /* Evaluate the arguments right now, but call the cleanup function later. */
+        return #{
+            var tmp1 = $cleanup ... ;
+            $state_machine.pushCleanupAction(tmp1, tmp1.$methId, [$arg (,) ...]);
+            case $id2:
+            step_state $task $state_machine $id2 { $rest ... }
+        };
+    }
+    case { $me $task $state_machine $id { finally $cleanup ... [ $methExpr:expr ] ($arg:expr (,) ...) ; } { $rest ... } } => {
+        var id = unwrapSyntax(#{$id});
+        letstx $id2 = [makeValue(id + 1, #{$id})];
+        /* Evaluate the arguments right now, but call the cleanup function later. */
+        return #{
+            var tmp1 = $cleanup ... ;
+            $state_machine.pushCleanupAction(tmp1, tmp1[$methExpr], [$arg (,) ...]);
+            case $id2:
+            step_state $task $state_machine $id2 { $rest ... }
+        };
+    }
     case { $me $task $state_machine $id { finally $cleanup ... ($arg:expr (,) ...) ; } { $rest ... } } => {
         var id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + 1, #{$id})];
         /* Evaluate the arguments right now, but call the cleanup function later. */
         return #{
-            $state_machine.pushCleanupAction($cleanup ... , [$arg (,) ...]);
+            $state_machine.pushCleanupAction(this, $cleanup ... , [$arg (,) ...]);
             case $id2:
             step_state $task $state_machine $id2 { $rest ... }
         };
