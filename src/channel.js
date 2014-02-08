@@ -204,6 +204,26 @@ Channel.prototype.takeN = function (N, callback) {
     self.take(receive);
 };
 
+// Switches the channel to a state where every time some
+// reader takes a value from the channel, they'll get
+// `value` delivered immediately. This makes a channel
+// behave somewhat like a promise, where until `fill`
+// is called, asking for a value will cause a wait, but
+// once `fill` is called somewhere, `take` will always
+// succeed with a single value.
+Channel.prototype.fill = function (value) {
+    this.take = function (callback) {
+        sendValue(value, callback);
+    };
+    this.put = function (ignoredValue, callback) {
+        // no-op
+        sendValue(value, callback);
+    };
+    this.fill = function (ignoredValue) {
+        // no-op.
+    };
+};
+
 function MergedChannelValue(i, ch, err, value) {
     this.ix = i;
     this.chan = ch;
