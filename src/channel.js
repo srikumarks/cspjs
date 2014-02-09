@@ -229,9 +229,9 @@ Channel.prototype.fill = function (value) {
 // callback will be called when the last value is
 // accepted.
 Channel.prototype.stream = function (array, callback) {
-    var i = 0, len = array.length, self = this;
+    var i = 0, self = this;
     function next() {
-        if (i < len) {
+        if (i < array.length) {
             self.put(array[i++], next);
         } else {
             sendValue(array, callback);
