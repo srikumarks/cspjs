@@ -224,6 +224,66 @@ Channel.prototype.fill = function (value) {
     };
 };
 
+// Sends the elements of the given array one by one
+// to the channel as readers request values. The
+// callback will be called when the last value is
+// accepted.
+Channel.prototype.stream = function (array, callback) {
+    var i = 0, len = array.length, self = this;
+    function next() {
+        if (i < len) {
+            self.put(array[i++], next);
+        } else {
+            sendValue(array, callback);
+        }
+    }
+    next();
+};
+
+// Sets up the channel to receive events of the given type
+// from the given domElement. (Works only in the browser.)
+// `domElement` can either be a string which is taken to be
+// a querySelector specifier, an array of DOM nodes, or
+// a single DOM node. `eventName` is a string like 'click'
+// which gives an event category to bind to.
+//
+// Note: If you want a channel to not receive events
+// too frequently, you can first debounce the channel
+// before listening for events, like this -
+//
+//      ch = new Channel();
+//      ch.debounce(100).listen('.textarea', 'change');
+//
+// The above code will make sure that consecutive change 
+// events are separated by at least 100ms. The debounce()
+// method call produces a wrapper channel object that
+// acts as a gatekeeper to the original channel object
+// 'ch'. So, while the above way will result in debounced
+// actions, you can subsequently call `ch.listen()` to
+// bypass debouncing on the same channel. Readers reading
+// `ch` will receive events from the debounced elements
+// as well from the elements bound directly.
+Channel.prototype.listen = function (domElement, eventName) {
+    var self = this;
+    var elements = null;
+    if (typeof domElement === 'string') {
+        elements = document.querySelectorAll(domElement);
+    } else if (domElement.length) {
+        elements = domElement;
+    } else {
+        elements = [domElement];
+    }
+
+    function listener(event) {
+        self.put(event);
+        event.stopPropagation();
+    }
+
+    for (var i = 0, N = elements.length; i < N; ++i) {
+        elements[i].addEventListener(eventName, listener);
+    }
+};
+
 function MergedChannelValue(i, ch, err, value) {
     this.ix = i;
     this.chan = ch;
