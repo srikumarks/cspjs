@@ -404,9 +404,9 @@ function debouncingPut(value, callback) {
 // that put() operations will immediately succeed
 // as long as fewer than N values have been placed
 // on the channel.
-Channel.buffered = function (N, channel) {
-    var ch = Object.create(channel);
-    ch._channel = channel;
+Channel.prototype.buffer = function (N) {
+    var ch = Object.create(this);
+    ch._channel = this;
     ch._bufferLength = N;
     ch.put = bufferedPut;
     ch.take = bufferedTake;
@@ -424,8 +424,8 @@ function bufferedPut(value, callback) {
 
 function bufferedTake(callback) {
     this._channel.take(callback);
-    if (this._queue.length >= this._bufferLength - 1) {
-        var q = this._queue[N-2];
+    if (this.backlog >= this._bufferLength) {
+        var q = this._queue[this._bufferLength - 1];
         sendValue(q.value, q.callback);
         q.callback = null;
     }
@@ -436,10 +436,13 @@ function bufferedTake(callback) {
 // and a writer tries to place one more value, sometimes
 // we want the new value to be dropped in order that
 // processing requirements don't accumulate. This is
-// the purpose of `droppingAfter` which wraps the 
+// the purpose of `droppingBuffer` which wraps the 
 // parent channel's `put` to do this dropping.
+//
+// A channel with a droppingBuffer will never block a put
+// operation.
 
-Channel.prototype.droppingAfter = function (N) {
+Channel.prototype.droppingBuffer = function (N) {
     var ch = Object.create(this);
     ch._channel = this;
     ch._bufferLength = N;
@@ -449,20 +452,25 @@ Channel.prototype.droppingAfter = function (N) {
 
 function droppingPut(value, callback) {
     if (this.backlog < this._bufferLength) {
-        this._channel.put(value, callback);
+        this._channel.put(value);
+        sendValue(value, callback);
     } else {
+        // Drop the value.
         sendValue(null, callback);
     }
 }
 
-// In the same situation as with `droppingAfter`,
+// In the same situation as with `droppingBuffer`,
 // at other times, we want the more recent values
 // to take precedence over the values already in 
 // the queue. In this case, we want to expire the
 // old values and replace them with new values.
-// That is what `expiringAfter` does.
+// That is what `expiringBuffer` does.
+//
+// A channel with an expiringBuffer will never block a 
+// put operation.
 
-Channel.prototype.expiringAfter = function (N) {
+Channel.prototype.expiringBuffer = function (N) {
     var ch = Object.create(this);
     ch._channel = this;
     ch._bufferLength = N;
@@ -471,10 +479,11 @@ Channel.prototype.expiringAfter = function (N) {
 };
 
 function expiringPut(value, callback) {
-    while (this.backlog > this._bufferLength) {
+    while (this.backlog >= this._bufferLength) {
         this.take();
     }
-    this._channel.put(value, callback);
+    this._channel.put(value);
+    sendValue(value, callback);
     return this;
 }
 
