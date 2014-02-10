@@ -320,23 +320,26 @@ Channel.merge = function (channels) {
     return channel;
 };
 
-// Makes a "timeout" channel, where every time someone pulls
-// a value from it, it is delivered after "ms" milliseconds.
-// This channel is not writeable.
-Channel.timeout = function (ms) {
-    var channel = new Channel();
-    channel._timeInterval_ms = ms;
-    channel.take = timeoutTake;
-    return channel;
+// It is sometimes useful to also have a value sent to
+// an existing channel after a timeout expires. If some
+// other process is supposed to write a value to the
+// channel and it is taking too long, the value passed
+// to the .timeout() call can be tested against to decide
+// whether a timeout occurred before the process could
+// do its thing.
+Channel.prototype.timeout = function (ms, value) {
+    setTimeout(timeoutTick, ms, this, value);
+    return this;
 };
 
-function timeoutTick(channel) {
-    channel.put(true);
-}
+// Makes a "timeout" channel, which'll deliver a value
+// a given interval after the channel is created.
+Channel.timeout = function (ms, value) {
+    return (new Channel()).timeout(ms, value);
+};
 
-function timeoutTake(callback) {
-    setTimeout(timeoutTick, this._timeInterval_ms, this);
-    Channel.prototype.take.call(this, callback);
+function timeoutTick(channel, value) {
+    channel.put(value);
 }
 
 // Makes a "clock" channel which, once started, will produce
