@@ -7,7 +7,9 @@ describe('Channel', function () {
         it('should not call the callback immediately', function (done) {
             var ch = new Channel();
             var cond = false;
-            ch.put(5);
+            ch.put(5, function () {
+                cond = true;
+            });
             ch.take(function (err, value) {
                 cond = true;
                 done();
