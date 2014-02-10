@@ -140,7 +140,7 @@ Channel.prototype.reduce = function (initial, cond, f) {
     var result = initial;
     function receive(err, value) {
         result = f(result, value);
-        process.nextTick(loop);
+        loop();
     }
     function loop() {
         if (cond()) {
