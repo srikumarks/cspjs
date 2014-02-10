@@ -163,11 +163,11 @@ Channel.prototype.group = function (N) {
     function receive(err, value) {
         group.push(value);
         if (group.length < N) {
-            process.nextTick(loop);
+            loop();
         } else {
             var g = group;
             group = [];
-            gch.put(g, receive);
+            gch.put(g, loop);
         }
     }
 
