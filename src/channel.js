@@ -204,6 +204,8 @@ Channel.prototype.takeN = function (N, callback) {
     self.take(receive);
 };
 
+function noop() {}
+
 // Switches the channel to a state where every time some
 // reader takes a value from the channel, they'll get
 // `value` delivered immediately. This makes a channel
@@ -219,9 +221,7 @@ Channel.prototype.fill = function (value) {
         // no-op
         sendValue(value, callback);
     };
-    this.fill = function (ignoredValue) {
-        // no-op.
-    };
+    this.fill = noop;
 };
 
 // Sends the elements of the given array one by one
