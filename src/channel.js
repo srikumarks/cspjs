@@ -100,7 +100,7 @@ Channel.prototype.map = function (cond, f) {
     function loop() {
         self.take(receive);
     }
-    process.nextTick(loop);
+    loop();
     return ch2;
 };
 
@@ -126,7 +126,7 @@ Channel.prototype.filter = function (cond, f) {
     function loop() {
         self.take(receive);
     }
-    process.nextTick(loop);
+    loop();
     return ch2;
 };
 
@@ -149,7 +149,7 @@ Channel.prototype.reduce = function (initial, cond, f) {
             ch2.put(result);
         }
     }
-    process.nextTick(loop);
+    loop();
     return ch2;
 };
 
@@ -175,7 +175,7 @@ Channel.prototype.group = function (N) {
         self.take(receive);
     }
 
-    process.nextTick(loop);
+    loop();
     return gch;
 };
 
