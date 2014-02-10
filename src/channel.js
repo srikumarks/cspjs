@@ -380,9 +380,9 @@ function clockStop() {
 // debounce the values placed on it - i.e. it will
 // reject put() operations that occur within a time
 // of "ms" milliseconds between each other.
-Channel.debounce = function (ms, channel) {
-    var ch = Object.create(channel);
-    ch._channel = channel;
+Channel.prototype.debounce = function (ms) {
+    var ch = Object.create(this);
+    ch._channel = this;
     ch._debounceInterval_ms = ms;
     ch._lastPutTime = 0;
     ch.put = debouncingPut;
