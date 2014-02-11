@@ -157,9 +157,9 @@ macro task {
 macro setup_state_machine {
     rule { $task $callback $formals { $body ... } } => {
         var StateMachine = arguments.callee.StateMachine || (arguments.callee.StateMachine = require('state_machine'));
-        var state_machine;
-        declare_state_variables $task ($callback) { $body ... } 
         declare_state_arguments $formals ;
+        var state_machine = new StateMachine(this, $callback, state_machine_fn);
+        declare_state_variables $task state_machine 0 ($callback) { $body ... } 
         function state_machine_fn(err) {
             if (err && !state_machine.state.isUnwinding) { return state_machine.callback(err); }
             try {
@@ -175,7 +175,6 @@ macro setup_state_machine {
                 state_machine.callback(e);
             }
         }
-        state_machine = new StateMachine(this, $callback, state_machine_fn);
         state_machine.start();
         return state_machine.controlAPIMaker;
     }
@@ -188,41 +187,43 @@ macro setup_state_machine {
 // to the `declare_state_variables` macro is expected to match this.
 
 macro declare_state_variables {
-    rule { $task $vars { if ($x ...) { $then ... } else { $else ... } $rest ... } } => {
-        declare_state_variables $task $vars { $then ... $else ... $rest ... }
+    rule { $task $state_machine $fin $vars { if ($x ...) { $then ... } else { $else ... } $rest ... } } => {
+        declare_state_variables $task $state_machine $fin $vars { $then ... $else ... $rest ... }
     }
-    rule { $task $vars { if ($x ...) { $then ... }  $rest ... } } => {
-        declare_state_variables $task $vars { $then ... $rest ... }
+    rule { $task $state_machine $fin $vars { if ($x ...) { $then ... }  $rest ... } } => {
+        declare_state_variables $task $state_machine $fin $vars { $then ... $rest ... }
     }
     // Rewrite for loops using while.
-    rule { $task $vars { for ($init ... ; $cond ... ; $next ...) { $body ... }  $rest ... } } => {
-        declare_state_variables $task $vars { $init ... ; while ($cond ...) { $body ... $next ... ; } $rest ... }
+    rule { $task $state_machine $fin $vars { for ($init ... ; $cond ... ; $next ...) { $body ... }  $rest ... } } => {
+        declare_state_variables $task $state_machine $fin $vars { $init ... ; while ($cond ...) { $body ... $next ... ; } $rest ... }
     }
-    rule { $task $vars { while ($x ...) { $body ... }  $rest ... } } => {
-        declare_state_variables $task $vars { $body ... $rest ... }
+    rule { $task $state_machine $fin $vars { while ($x ...) { $body ... }  $rest ... } } => {
+        declare_state_variables $task $state_machine $fin $vars { $body ... $rest ... }
     }
-    rule { $task $vars { finally $cleanup ... ($args:expr (,) ...) ; $rest ... } } => {
-        declare_state_variables $task $vars { $rest ... }
+    rule { $task $state_machine $fin $vars { finally $cleanup ... ($args:expr (,) ...) ; $rest ... } } => {
+        declare_state_variables $task $state_machine $fin $vars { $rest ... }
     }
-    rule { $task $vars { finally { $cleanup ... } $rest ... } } => {
-        declare_state_variables $task $vars { $cleanup ... $rest ... }
+    // If a finally block is encountered somewhere in the body, then we
+    // need to be able to save and restore state variables. So keep track of that.
+    rule { $task $state_machine $fin $vars { finally { $cleanup ... } $rest ... } } => {
+        declare_state_variables $task $state_machine 1 $vars { $cleanup ... $rest ... }
     }
-    rule { $task $vars { catch ($eclass:ident $e:ident) { $handler ... } $rest ... } } => {
-        declare_state_variables $task $vars { var $e = null ; $handler ... $rest ... }
+    rule { $task $state_machine $fin $vars { catch ($eclass:ident $e:ident) { $handler ... } $rest ... } } => {
+        declare_state_variables $task $state_machine $fin $vars { var $e = null ; $handler ... $rest ... }
     }
-    rule { $task $vars { catch ($e:ident) { $handler ... } $rest ... } } => {
-        declare_state_variables $task $vars { var $e = null ; $handler ... $rest ... }
+    rule { $task $state_machine $fin $vars { catch ($e:ident) { $handler ... } $rest ... } } => {
+        declare_state_variables $task $state_machine $fin $vars { var $e = null ; $handler ... $rest ... }
     }
-    rule { $task $vars { switch ($x ...) { $(case $ix:lit : { $body ... }) ... } $rest ... } } => {
-        declare_state_variables $task $vars { $($body ...) ... $rest ... }
+    rule { $task $state_machine $fin $vars { switch ($x ...) { $(case $ix:lit : { $body ... }) ... } $rest ... } } => {
+        declare_state_variables $task $state_machine $fin $vars { $($body ...) ... $rest ... }
     }
-    rule { $task $vars { $step ... ; $rest ... } } => {
-        declare_state_variables_step $task $vars { $step ... ; } { $rest ... }
+    rule { $task $state_machine $fin $vars { $step ... ; $rest ... } } => {
+        declare_state_variables_step $task $state_machine $fin $vars { $step ... ; } { $rest ... }
     }
-    rule { $task $vars { } } => { 
-        declare_unique_varset $task $vars ;
+    rule { $task $state_machine $fin $vars { } } => { 
+        declare_unique_varset $task $state_machine $fin $vars ;
     }
-    rule { $task () { } } => { 
+    rule { $task $state_machine $fin () { } } => { 
     }
 }
 
@@ -232,34 +233,44 @@ macro declare_state_variables {
 // as much as we can.
 
 macro declare_unique_varset {
-	case { _ $task ($v ...) } => {
+	case { _ $task $state_machine $fin ($v ...) } => {
 		var vars = #{$v ...};
 		var varnames = vars.map(unwrapSyntax);
 		var uniqvarnames = {};
 		varnames.forEach(function (v) { uniqvarnames['%' + v] = true; });
 		letstx $uvars ... = Object.keys(uniqvarnames).map(function (v) { return makeIdent(v.substring(1), #{$task}); });
-		return #{ declare_varset $task ($uvars ...) ; };
+		return #{ declare_varset $task $state_machine $fin ($uvars ...) ; };
 	}
 }
 
 macro declare_varset {
-	rule { $task ($v ...) ; } => {
-		var $v (,) ... ;
-	}
+    rule { $task $state_machine 0 ($v ...) ; } => {
+        var $v (,) ... ;
+    }
+    rule { $task $state_machine 1 ($v ...) ; } => {
+        var $v (,) ... ;
+        $state_machine.captureStateVars = function () { 
+            return [$v (,) ...]; 
+        };
+        $state_machine.restoreStateVars = function (state) {
+            var i = 0;
+            $($v = state[i++];) ...
+        };
+    }
 }
 
 macro declare_state_variables_step {
-	rule { $task ($v ...) { $x:ident <- $y ... ; } { $rest ... } } => {
-		declare_state_variables $task ($x $v ...) { $rest ... }
+	rule { $task $state_machine $fin ($v ...) { $x:ident <- $y ... ; } { $rest ... } } => {
+		declare_state_variables $task $state_machine $fin ($x $v ...) { $rest ... }
 	}
-	rule { $task ($v ...) { $x:ident (,) ... <- $y ... ; } { $rest ... } } => {
-		declare_state_variables $task ($x ... $v ...) { $rest ... }
+	rule { $task $state_machine $fin ($v ...) { $x:ident (,) ... <- $y ... ; } { $rest ... } } => {
+		declare_state_variables $task $state_machine $fin ($x ... $v ...) { $rest ... }
 	}
-	rule { $task ($v ...) { var $($x:ident = $y:expr) (,) ... ; } { $rest ... } } => {
-		declare_state_variables $task ($x ... $v ...) { $rest ... }
+	rule { $task $state_machine $fin ($v ...) { var $($x:ident = $y:expr) (,) ... ; } { $rest ... } } => {
+		declare_state_variables $task $state_machine $fin ($x ... $v ...) { $rest ... }
 	}
-	rule { $task $vs { $x ... ; } { $rest ... } } => {
-		declare_state_variables $task $vs { $rest ... }
+	rule { $task $state_machine $fin $vs { $x ... ; } { $rest ... } } => {
+		declare_state_variables $task $state_machine $fin $vs { $rest ... }
 	}
 }
 

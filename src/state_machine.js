@@ -47,6 +47,13 @@ function StateMachine(context, callback, fn) {
     this.fn = fn;
     this.context = context;
     this.finalCallback = callback;
+
+    // The following two will be initialized if the body
+    // of the state machine contains a finally {} block.
+    // If not, they can remain null.
+    this.captureStateVars = null; // Might be initialized to function () { return array; }
+    this.restoreStateVars = null; // Might be initialized to function (array) { assign state variables; }
+
     this.boundStep = this.step.bind(this);
     this.boundUnwind = this.unwind.bind(this);
     this.cachedJumpTable = {};
@@ -114,6 +121,7 @@ StateMachine.prototype.unwind = function () {
             if (where.fn) {
                 where.fn(this.unwind);
             } else {
+                this.restoreStateVars(where.state);
                 this.goTo(where.step);
             }
         }
@@ -142,7 +150,7 @@ StateMachine.prototype.pushCleanupAction = function (context, fn, args) {
 
 StateMachine.prototype.pushCleanupStep = function (id) {
     if (!this.state.installed_catches[id]) {
-        this.state.unwinding.push({cleanup: true, step: id});
+        this.state.unwinding.push({cleanup: true, step: id, state: this.captureStateVars()});
         this.state.installed_catches[id] = true;
     }
 };
