@@ -5,8 +5,8 @@
 // is consumed from the read end.
 
 function Channel() {
-    this._queue = [];
-    this._pending = [];
+    this._queue = new Array;
+    this._pending = new Array;
     return this;
 }
 
@@ -18,13 +18,21 @@ function sendError(err, callback) {
     callback && process.nextTick(function () { callback(err, null); });
 }
 
+function sendValueS(value, callback) {
+    callback && callback(null, value);
+}
+
+function sendErrorS(err, callback) {
+    callback && callback(err, null);
+}
+
 
 // Read a value from the channel, passing the value to the given callback.
 Channel.prototype.take = function (callback) {
     if (this._queue.length > 0) {
         var q = this._queue.shift();
-        sendValue(q.value, q.callback);
-        sendValue(q.value, callback);
+        sendValue(q._value, q);
+        sendValue(q._value, callback);
     } else {
         callback && this._pending.push(callback);
     }
@@ -33,12 +41,14 @@ Channel.prototype.take = function (callback) {
 // Places a value into the channel. The callback will be called when the value is
 // consumed from the read-end.
 Channel.prototype.put = function (value, callback) {
+    callback = callback || function noop() {};
     if (this._pending.length > 0) {
         var p = this._pending.shift();
         sendValue(value, callback);
         sendValue(value, p);
     } else {
-        this._queue.push({callback: callback, value: value});
+        callback._value = value;
+        this._queue.push(callback);
     }
 };
 
@@ -62,27 +72,21 @@ Channel.prototype.receive = function (id) {
 };
 
 // Answers "will read succeed immediately?"
-Object.defineProperty(Channel.prototype, 'canRead', {
-    get: function () { 
-        return this._queue.length > 0 && this._pending.length === 0;
-    }
-});
+Channel.prototype.canRead = function () {
+    return this._queue.length > 0 && this._pending.length === 0;
+};
 
 // Answers "will write succeed immediately?"
-Object.defineProperty(Channel.prototype, 'canWrite', {
-    get: function () {
-        return this._pending.length > 0 || this._queue.length === 0;
-    }
-});
+Channel.prototype.canWrite = function () {
+    return this._pending.length > 0 || this._queue.length === 0;
+};
 
 // Answers "how many values have been placed into the channel?"
 // Positive values give the number of values available right away.
 // Negative values give the number of pending take operations.
-Object.defineProperty(Channel.prototype, 'backlog', {
-    get: function () {
-        return this._queue.length - this._pending.length;
-    }
-});
+Channel.prototype.backlog = function () {
+    return this._queue.length - this._pending.length;
+};
 
 // Makes a new channel whose values are transformed by the given
 // function "f". `cond(value)` is a function that specifies a 
@@ -414,7 +418,7 @@ Channel.prototype.buffer = function (N) {
 };
 
 function bufferedPut(value, callback) {
-    if (this.backlog < this._bufferLength) {
+    if (this.backlog() < this._bufferLength) {
         this._channel.put(value);
         sendValue(value, callback);
     } else {
@@ -424,10 +428,9 @@ function bufferedPut(value, callback) {
 
 function bufferedTake(callback) {
     this._channel.take(callback);
-    if (this.backlog >= this._bufferLength) {
+    if (this.backlog() >= this._bufferLength) {
         var q = this._queue[this._bufferLength - 1];
-        sendValue(q.value, q.callback);
-        q.callback = null;
+        sendValue(q._value, q);
     }
 }
 
@@ -451,7 +454,7 @@ Channel.prototype.droppingBuffer = function (N) {
 };
 
 function droppingPut(value, callback) {
-    if (this.backlog < this._bufferLength) {
+    if (this.backlog() < this._bufferLength) {
         this._channel.put(value);
         sendValue(value, callback);
     } else {
@@ -479,7 +482,7 @@ Channel.prototype.expiringBuffer = function (N) {
 };
 
 function expiringPut(value, callback) {
-    while (this.backlog >= this._bufferLength) {
+    while (this.backlog() >= this._bufferLength) {
         this.take();
     }
     this._channel.put(value);

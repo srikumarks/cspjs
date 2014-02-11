@@ -83,10 +83,10 @@ describe('Channel', function () {
         it('should have a fixed backlog', task {
             var ch = new Channel();
             ch.stream([1,2,3,4,5,6,7,8,9]);
-            assert.equal(ch.backlog, 1);
+            assert.equal(ch.backlog(), 1);
             x <- ch.takeN(3);
             assert.deepEqual(x, [1,2,3]);
-            assert.equal(ch.backlog, 1);
+            assert.equal(ch.backlog(), 1);
         });
     });
 
@@ -126,7 +126,7 @@ describe('Channel', function () {
             await ch.put(3);
             await ch.put(4);
             await ch.put(5); // None of these puts should result in a wait.
-            assert.equal(ch.backlog, 5);
+            assert.equal(ch.backlog(), 5);
             task { <- chan Channel.timeout(100); <- chan ch; }();
             var start = Date.now();
             await ch.put(6); // .. but this put should wait for a read.
