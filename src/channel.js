@@ -46,7 +46,6 @@ Channel.prototype.take = function (callback) {
 // Places a value into the channel. The callback will be called when the value is
 // consumed from the read-end.
 Channel.prototype.put = function (value, callback) {
-    callback = callback || function noop() {};
     if (this._pending.length > 0) {
         var p = this._pending.shift();
         sendValue(value, callback);
