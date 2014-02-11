@@ -26,12 +26,17 @@ function sendErrorS(err, callback) {
     callback && callback(err, null);
 }
 
+function CBV(callback, value) {
+    this._callback = callback;
+    this._value = value;
+    return this;
+}
 
 // Read a value from the channel, passing the value to the given callback.
 Channel.prototype.take = function (callback) {
     if (this._queue.length > 0) {
         var q = this._queue.shift();
-        sendValue(q._value, q);
+        sendValue(q._value, q._callback);
         sendValue(q._value, callback);
     } else {
         callback && this._pending.push(callback);
@@ -47,8 +52,7 @@ Channel.prototype.put = function (value, callback) {
         sendValue(value, callback);
         sendValue(value, p);
     } else {
-        callback._value = value;
-        this._queue.push(callback);
+        this._queue.push(new CBV(callback, value));
     }
 };
 
@@ -430,7 +434,7 @@ function bufferedTake(callback) {
     this._channel.take(callback);
     if (this.backlog() >= this._bufferLength) {
         var q = this._queue[this._bufferLength - 1];
-        sendValue(q._value, q);
+        sendValue(q._value, q._callback);
     }
 }
 
