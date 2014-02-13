@@ -1,0 +1,22 @@
+{
+    "name": "cspjs",
+    "description": "A macro for easing programming with async Javascript APIs",
+    "author": "Srikumar",
+    "dependencies": {
+        "sweet.js" : ">= 0.4.1"
+    },
+    "devDependencies": {
+        "mocha": "~1.3.2"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git://github.com/srikumarks/cspjs.git"
+    },
+    "keywords": [
+        "macros",
+        "javascript",
+        "csp",
+        "asynchronous"
+    ],
+    "license": "MIT"
+}
