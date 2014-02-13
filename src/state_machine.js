@@ -149,14 +149,14 @@ StateMachine.prototype.pushCleanupAction = function (context, fn, args) {
 };
 
 StateMachine.prototype.pushCleanupStep = function (id) {
-    if (!this.state.installed_catches[id]) {
-        this.state.unwinding.push({cleanup: true, step: id, state: this.captureStateVars()});
-        this.state.installed_catches[id] = true;
-    }
+    this.state.unwinding.push({cleanup: true, step: id, state: this.captureStateVars()});
 };
 
 StateMachine.prototype.pushErrorStep = function (id) {
-    this.state.unwinding.push({isError: true, step: id});
+    if (!this.state.installed_catches[id]) {
+        this.state.unwinding.push({isError: true, step: id});
+        this.state.installed_catches[id] = true;
+    }
 };
 
 StateMachine.prototype.pushPhi = function (id) {
