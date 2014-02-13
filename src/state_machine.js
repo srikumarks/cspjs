@@ -119,7 +119,8 @@ StateMachine.prototype.unwind = function () {
             }
         } else {
             if (where.fn) {
-                where.fn(this.unwind);
+                where.fn();
+                process.nextTick(this.boundUnwind);
             } else {
                 this.restoreStateVars(where.state);
                 this.goTo(where.step);
@@ -141,8 +142,7 @@ StateMachine.prototype.pushCleanupAction = function (context, fn, args) {
     var self = this;
     self.state.unwinding.push({
         cleanup: true,
-        fn: function (cb) {
-            args[callbackPos] = cb;
+        fn: function () {
             fn.apply(context, args);
         }
     });
