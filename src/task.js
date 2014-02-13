@@ -214,7 +214,7 @@ macro declare_state_variables {
     rule { $task $state_machine $fin $vars { catch ($e:ident) { $handler ... } $rest ... } } => {
         declare_state_variables $task $state_machine $fin $vars { var $e = null ; $handler ... $rest ... }
     }
-    rule { $task $state_machine $fin $vars { switch ($x ...) { $(case $ix:lit : { $body ... }) ... } $rest ... } } => {
+    rule { $task $state_machine $fin $vars { switch ($x ...) { $(case $ix:lit (,) ... : { $body ... }) ... } $rest ... } } => {
         declare_state_variables $task $state_machine $fin $vars { $($body ...) ... $rest ... }
     }
     rule { $task $state_machine $fin $vars { $step ... ; $rest ... } } => {
@@ -360,8 +360,8 @@ macro count_states {
     rule { $task ($n ...) { catch ($e ...) { $handler ... } $rest ... } } => {
         count_states $task (2 $n ...) { $handler ... $rest ... }
     }
-    rule { $task $n { switch ($x ...) { $(case $ix:lit : { $body ... }) ... } $rest ... } } => {
-        count_states $task (1 $n) { $($body ... phi $state_machine ;) ... $rest ... }
+    rule { $task $n  { switch ($x ...) { $(case $ix:lit (,) ... : { $body ... }) ... } $rest ... } } => {
+        count_states $task $n { $($body ... phi $state_machine ;) ... $rest ... }
     }
     rule { $task ($n ...) { $step ... ; $rest ... } } => {
         count_states $task (1 $n ...) { $rest ... }
