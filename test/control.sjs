@@ -27,6 +27,20 @@ describe('errors', function () {
             throw new Error("boom!");
         });
 
+        it('must bubble up an error if a catch has no return in it', task {
+            catch (e) {
+                assert.equal(e, "boom!");
+                return true;
+            }
+
+            catch (e) {
+                assert.equal(e, "boom!");
+                e = "poof!";
+            }
+
+            throw "boom!";
+        });
+
         it('must bubble up unhandled errors in reverse order', task {
             var arr = [];
             catch (e) {

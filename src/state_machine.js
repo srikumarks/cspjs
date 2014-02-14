@@ -6,6 +6,7 @@
 function State() {
     this.id = 0;
     this.args = [null, null];
+    this.err = null;
     this.unwinding = [];
     this.phi = [];
     this.installed_catches = {};
@@ -102,8 +103,9 @@ StateMachine.prototype.thenTo = function (id) {
     };
 };
 
-StateMachine.prototype.callback = function () {
+StateMachine.prototype.callback = function (err) {
     this.state.args = Array.prototype.slice.call(arguments);
+    this.state.err = err;
     process.nextTick(this.boundUnwind);
 };
 
@@ -112,7 +114,7 @@ StateMachine.prototype.unwind = function () {
         var where = this.state.unwinding.pop();
         this.state.isUnwinding = true;
         if (where.isError) {
-            if (this.state.args[0]) {
+            if (this.state.err) {
                 this.goTo(where.step);
             } else {
                 process.nextTick(this.boundUnwind);

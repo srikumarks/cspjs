@@ -577,7 +577,7 @@ macro step_state_line_catch {
             $state_machine.goTo($id2 + 1 + jumpHandler);
             break;
             case $id2:
-            $e = arguments[0];
+            $e = $state_machine.state.err;
             if (!($e && $e instanceof $eclass)) {
                 $state_machine.unwindNextTick();
                 break;
@@ -595,7 +595,7 @@ macro step_state_line_catch {
             $state_machine.goTo($id2 + 1 + jumpHandler);
             break;
             case $id2:
-            $e = arguments[0];
+            $e = $state_machine.state.err;
             step_state $task $state_machine $id2 { $handler ... unwind $state_machine ; $rest ... }
         };
     }
