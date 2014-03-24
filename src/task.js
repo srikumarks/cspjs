@@ -363,6 +363,15 @@ macro count_states {
     rule { $task $n  { switch ($x ...) { $(case $ix:lit (,) ... : { $body ... }) ... } $rest ... } } => {
         count_states $task $n { $($body ... phi $state_machine ;) ... $rest ... }
     }
+    rule { $task ($n ...) { $x:ident (,) ... <- chan $y ... ; $rest ... } } => {
+        count_states $task (2 $n ...) { $rest ... }
+    }
+    rule { $task ($n ...) { $x:ident (,) ... <- $y ... (); $rest ... } } => {
+        count_states $task (2 $n ...) { $rest ... }
+    }
+    rule { $task ($n ...) { $x:ident (,) ... <- $y ... ($args:expr (,) ...); $rest ... } } => {
+        count_states $task (2 $n ...) { $rest ... }
+    }
     rule { $task ($n ...) { $step ... ; $rest ... } } => {
         count_states $task (1 $n ...) { $rest ... }
     }
@@ -642,7 +651,7 @@ macro step_state_line {
 
     case { $me $task $state_machine $id { $x:ident (,) ... <- chan $y ... ; } { $rest ... } } => {
         var id = unwrapSyntax(#{$id});
-        letstx $id2 = [makeValue(id + 1, #{$id})];
+        letstx $id2 = [makeValue(id + 1, #{$id})], $id3 = [makeValue(id + 2, #{$id})];
         // In this form (ex: z <- chan blah[32].bling(); ), the expression is expected to
         // produce a channel, from which a value will be taken. 
         //
@@ -659,7 +668,8 @@ macro step_state_line {
             case $id2:
             var i = 1;
             $($x = arguments[i++];) ...
-                step_state $task $state_machine $id2 { $rest ... }
+            case $id3:
+                step_state $task $state_machine $id3 { $rest ... }
         };
     }
 
@@ -674,27 +684,29 @@ macro step_state_line {
     // case and without one in the other.
     case { $me $task $state_machine $id { $x:ident (,) ... <- $y ... (); } { $rest ... } } => {
         var id = unwrapSyntax(#{$id});
-        letstx $id2 = [makeValue(id + 1, #{$id})];
+        letstx $id2 = [makeValue(id + 1, #{$id})], $id3 = [makeValue(id + 2, #{$id})];
         return #{
             $y ... ($state_machine.thenTo($id2));
             break;
             case $id2:
             var i = 1;
             $($x = arguments[i++];) ...
-                step_state $task $state_machine $id2 { $rest ... }
+            case $id3:
+                step_state $task $state_machine $id3 { $rest ... }
         };
     }
 
     case { $me $task $state_machine $id { $x:ident (,) ... <- $y ... ($args:expr (,) ...); } { $rest ... } } => {
         var id = unwrapSyntax(#{$id});
-        letstx $id2 = [makeValue(id + 1, #{$id})];
+        letstx $id2 = [makeValue(id + 1, #{$id})], $id3 = [makeValue(id + 2, #{$id})];
         return #{
             $y ... ($args (,) ... , $state_machine.thenTo($id2));
             break;
             case $id2:
             var i = 1;
             $($x = arguments[i++];) ...
-                step_state $task $state_machine $id2 { $rest ... }
+            case $id3:
+                step_state $task $state_machine $id3 { $rest ... }
         };
     }
 
