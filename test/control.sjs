@@ -168,6 +168,28 @@ describe('if_then_else', function () {
             }
             assert.ok(branched === false);
         });
+
+        function mockAsync(callback) {
+            process.nextTick(function () {
+                callback(null, 42);
+            });
+        }
+
+        it('must not touch variables if a branch is not taken', task {
+            var value = 24;
+            if (value > 30) {
+                value <- mockAsync();
+            }
+            assert.equal(value, 24);
+        });
+
+        it('must modify a variable if a branch with an async assignment is taken', task {
+            var value = 24;
+            if (value < 30) {
+                value <- mockAsync();
+            }
+            assert.equal(value, 42);
+        });
     });
     describe('else', function () {
         it('must branch on the condition being truthy', task {
