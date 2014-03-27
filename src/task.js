@@ -339,10 +339,10 @@ macro step_state {
 
 macro count_states {
     rule { $task ($n ...) { if ($x ...) { $then ... } else { $else ... } $rest ... } } => {
-        count_states $task (2 $n ...) { $then ... $else ... $rest ... }
+        count_states $task (3 $n ...) { $then ... $else ... $rest ... }
     }
     rule { $task ($n ...) { if ($x ...) { $then ... } $rest ... } } => {
-        count_states $task (1 $n ...) { $then ... $rest ... }
+        count_states $task (2 $n ...) { $then ... $rest ... }
     }
     // Rewrite for loops using while.
     rule { $task $n { for ($init ... ; $cond ... ; $next ...) { $body ... } $rest ... } } => {
@@ -398,16 +398,15 @@ macro step_state_line_if_else {
         var id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + 1, #{$id})];
         return #{
-            var jumpThen = count_states $task (0) { $then ... };
-            var jumpElse = count_states $task (0) { $else ... };
-            if ($x) {
-                $state_machine.pushPhi($id2 + 1 + jumpThen + jumpElse);
-            } else {
-                $state_machine.goTo($id2 + 1 + jumpThen);
+            var jumpThen = 1 + (count_states $task (0) { $then ... });
+            var jumpElse = 1 + (count_states $task (0) { $else ... });
+            $state_machine.pushPhi($id2 + jumpThen + jumpElse);
+            if (!($x)) {
+                $state_machine.goTo($id2 + jumpThen);
                 break;
             }
             case $id2:
-            step_state $task $state_machine $id2 { $then ... phi $state_machine ; $else ... ; $rest ... }
+            step_state $task $state_machine $id2 { $then ... phi $state_machine ; $else ... phi $state_machine ; $rest ... }
         };
     }
 }
@@ -417,13 +416,15 @@ macro step_state_line_if {
         var id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + 1, #{$id})];
         return #{
-            var jump = count_states $task (0) { $then ... };
-            if (!($x)) {
+            var jump = 1 + (count_states $task (0) { $then ... });
+            if ($x) {
+                $state_machine.pushPhi($id2 + jump);
+            } else {
                 $state_machine.goTo($id2 + jump);
                 break;
             }
             case $id2:
-            step_state $task $state_machine $id2 { $then ... $rest ... }
+            step_state $task $state_machine $id2 { $then ... phi $state_machine; $rest ... }
         };
     }
 }
@@ -560,11 +561,10 @@ macro step_state_line_finally_block {
         letstx $id2 = [makeValue(id + 1, #{$id})];
         return #{
             var jumpHandler = count_states $task (0) { $cleanup ... };
-            $state_machine.pushCleanupStep($id2);
-            $state_machine.goTo($id2 + 1 + jumpHandler);
+            $state_machine.pushCleanupStep($id2, $id2 + 1 + jumpHandler);
             break;
             case $id2:
-            step_state $task $state_machine $id2 { $cleanup ... unwind $state_machine ; $rest ... }
+            step_state $task $state_machine $id2 { $cleanup ... phi $state_machine ; $rest ... }
         };
     }
 }
@@ -582,16 +582,15 @@ macro step_state_line_catch {
         letstx $id2 = [makeValue(id + 1, #{$id})];
         return #{
             var jumpHandler = count_states $task (0) { $handler ... };
-            $state_machine.pushErrorStep($id2);
-            $state_machine.goTo($id2 + 1 + jumpHandler);
+            $state_machine.pushErrorStep($id2, $id2 + 1 + jumpHandler);
             break;
             case $id2:
             $e = $state_machine.state.err;
             if (!($e && $e instanceof $eclass)) {
-                $state_machine.unwindNextTick();
+                $state_machine.phi();
                 break;
             }
-            step_state $task $state_machine $id2 { $handler ... unwind $state_machine ; $rest ... }
+            step_state $task $state_machine $id2 { $handler ... phi $state_machine ; $rest ... }
         };
     }
 
@@ -600,12 +599,11 @@ macro step_state_line_catch {
         letstx $id2 = [makeValue(id + 1, #{$id})];
         return #{
             var jumpHandler = count_states $task (0) { $handler ... };
-            $state_machine.pushErrorStep($id2);
-            $state_machine.goTo($id2 + 1 + jumpHandler);
+            $state_machine.pushErrorStep($id2, $id2 + 1 + jumpHandler);
             break;
             case $id2:
             $e = $state_machine.state.err;
-            step_state $task $state_machine $id2 { $handler ... unwind $state_machine ; $rest ... }
+            step_state $task $state_machine $id2 { $handler ... phi $state_machine ; $rest ... }
         };
     }
 }
@@ -765,6 +763,25 @@ macro step_state_line {
         };
     }
 
+    // ### Retrying a failed operation.
+    //
+    // Within a catch block, you can use the retry statement 
+    //      retry;
+    // to jump control again to the beginning of the code that
+    // the catch block traps errors for ... which is immediately
+    // after the ending brace of the catch block.
+
+    case { $me $task $state_machine $id { retry ; } { $rest ... } } => {
+        var id = unwrapSyntax(#{$id});
+        letstx $id2 = [makeValue(id + 1, #{$id})];
+        return #{
+            $state_machine.retry();
+            break;
+            case $id2:
+            step_state $task $state_machine $id2 { $rest ... }	
+        };
+    }
+
 
     // ## Internals
     //
@@ -777,21 +794,6 @@ macro step_state_line {
         letstx $id2 = [makeValue(id + 1, #{$id})];
         return #{
             $state_machine.phi();
-            break;
-            case $id2:
-            step_state $task $state_machine $id2 { $rest ... }			
-        };
-    }
-
-    // ### `unwind`
-    //
-    // Used to begin or continue unwinding up the `finally` and `catch` sequences.
-
-    case { $me $task $state_machine $id { unwind $state_machine ; } { $rest ... } } => {
-        var id = unwrapSyntax(#{$id});
-        letstx $id2 = [makeValue(id + 1, #{$id})];
-        return #{
-            $state_machine.unwindNextTick();
             break;
             case $id2:
             step_state $task $state_machine $id2 { $rest ... }			

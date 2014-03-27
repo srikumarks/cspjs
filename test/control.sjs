@@ -55,18 +55,110 @@ describe('errors', function () {
             throw "boom!";
         });
 
-        it('must run only once even if placed within a loop', task {
-            var arr = [];
+        it('must be limited to if block', task {
+            var reached = false;
             catch (e) {
-                assert.deepEqual(arr, [1]);
+                assert.equal(reached, false);
                 return true;
             }
 
-            for (var i = 0; i < 5; ++i) {
-                catch (e) { arr.push(1); }
+            if (true) {
+                catch (e) {
+                    reached = true;
+                }
             }
 
             throw "boom!";
+        });
+
+        it('must be limited to else block', task {
+            var reached = false;
+            catch (e) {
+                assert.equal(reached, false);
+                return true;
+            }
+
+            if (false) {
+            } else {
+                catch (e) {
+                    reached = true;
+                }
+            }
+
+            throw "boom!";
+
+        });
+        
+        it('must be limited to while loop scope', task {
+            var reached = false;
+            catch (e) {
+                assert.equal(reached, false);
+                return true;
+            }
+
+            var n = 4;
+            while (n-- > 0) {
+                catch (e) {
+                    reached = true;
+                }
+            }
+
+            throw "boom!";
+        });
+        
+        it('must be limited to for loop scope', task {
+            var reached = false;
+            catch (e) {
+                assert.equal(reached, false);
+                return true;
+            }
+
+            for (var n = 4; n > 0; n--) {
+                catch (e) {
+                    reached = true;
+                }
+            }
+
+            throw "boom!";
+        });
+                
+        it('must be limited to switch block scope', task {
+            var reached = false;
+            catch (e) {
+                assert.equal(reached, false);
+                return true;
+            }
+
+            switch (1) {
+                case 1: {
+                    catch (e) {
+                        reached = true;
+                    }
+                }
+                case 2: {
+                    catch (e) {
+                        reached = true;
+                    }
+                }
+            }
+
+            throw "boom!";
+        });
+
+        it('must permit retries', task {
+            var tries = 1;
+            var arr = [];
+            catch (e) {
+                ++tries;
+                if (tries < 5) {
+                    retry;
+                }
+                assert.deepEqual(arr, [1,2,3,4]);
+                return true;
+            }
+
+            arr.push(tries);
+            throw "bomb!";
         });
     });
 
@@ -86,7 +178,7 @@ describe('errors', function () {
         it('must keep state variables intact during unwinding', task {
             var arr = [];
             catch (e) {
-                assert.deepEqual(arr, [3, 2, 1]);
+                assert.deepEqual(arr, [1,2,3]);
                 return true;
             }
             for (var i = 1; i <= 3; ++i) {
@@ -112,7 +204,7 @@ describe('errors', function () {
         it('must keep state variables intact during unwinding', task {
             var arr = [];
             catch (e) {
-                assert.deepEqual(arr, [3, 2, 1]);
+                assert.deepEqual(arr, [1, 2, 3]);
                 return true;
             }
             for (var i = 1; i <= 3; ++i) {

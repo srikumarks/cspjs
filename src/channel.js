@@ -4,6 +4,8 @@
 // with a value put into it will be called when the value
 // is consumed from the read end.
 
+var nextTick = setImmediate || process.nextTick;
+
 function Channel() {
     this._queue = new Array;
     this._pending = new Array;
@@ -11,11 +13,11 @@ function Channel() {
 }
 
 function sendValue(value, callback) {
-    callback && process.nextTick(function () { callback(null, value); });
+    callback && nextTick(function () { callback(null, value); });
 }
 
 function sendError(err, callback) {
-    callback && process.nextTick(function () { callback(err, null); });
+    callback && nextTick(function () { callback(err, null); });
 }
 
 function sendValueS(value, callback) {
