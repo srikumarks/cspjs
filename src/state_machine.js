@@ -43,10 +43,11 @@ function controlAPIMaker() {
     });
 }
 
-function StateMachine(context, callback, fn) {
+function StateMachine(context, callback, fn, task_fn) {
 
     this.state = new State();
     this.fn = fn;
+    this.task_fn = task_fn;
     this.context = context;
     this.finalCallback = callback;
 
@@ -58,8 +59,10 @@ function StateMachine(context, callback, fn) {
 
     this.boundStep = this.step.bind(this);
     this.boundUnwind = this.unwind.bind(this);
-    this.cachedJumpTable = {};
     this.controlAPIMaker = controlAPIMaker.bind(this);
+
+    // Initialize the jump table structure if not done already.
+    this.task_fn.cachedJumpTable = this.task_fn.cachedJumpTable || {};
 
     return this;
 }
@@ -214,8 +217,7 @@ StateMachine.prototype.phi = function () {
     nextTick(this.boundUnwind);
 };
 
-function JumpTable(sm, id, cases, blockSizes) {
-    this.state_machine = sm;
+function JumpTable(id, cases, blockSizes) {
     this.id = id;
     this.cases = cases;
     this.blockSizes = blockSizes;
@@ -235,25 +237,25 @@ function JumpTable(sm, id, cases, blockSizes) {
     return this;
 }
 
-JumpTable.prototype.jumpToCase = function (caseVal) {
-    this.state_machine.pushPhi(this.beyondID);
+JumpTable.prototype.jumpToCase = function (sm, caseVal) {
+    sm.pushPhi(this.beyondID);
     var stepID = this.stepIDs[caseVal];
     if (!stepID) {
         throw new Error("Unhandled case '" + caseVal + "' at step " + this.id);
     }
-    this.state_machine.goTo(stepID);
+    sm.goTo(stepID);
 };
 
 StateMachine.prototype.jumpTable = function (id, cases, blockSizes) {
     // cases[i] is an array of case values that all map
     // to the same block whose size is given by blockSizes[i].
     if (!cases) {
-        return this.cachedJumpTable[id];
+        return this.task_fn.cachedJumpTable[id];
     }
 
     console.assert(cases.length === blockSizes.length);
 
-    return this.cachedJumpTable[id] = new JumpTable(this, id, cases, blockSizes);
+    return this.task_fn.cachedJumpTable[id] = new JumpTable(id, cases, blockSizes);
 };
 
 

@@ -158,7 +158,7 @@ macro setup_state_machine {
     rule { $task $callback $formals { $body ... } } => {
         var StateMachine = arguments.callee.StateMachine || (arguments.callee.StateMachine = require('state_machine'));
         declare_state_arguments $formals ;
-        var state_machine = new StateMachine(this, $callback, state_machine_fn);
+        var state_machine = new StateMachine(this, $callback, state_machine_fn, arguments.callee);
         declare_state_variables $task state_machine 0 ($callback) { $body ... } 
         function state_machine_fn(err) {
             if (err && !state_machine.state.isUnwinding) { return state_machine.callback(err); }
@@ -465,7 +465,7 @@ macro step_state_line_switch {
             if (!(tmp1 = $state_machine.jumpTable($id))) {
                 tmp1 = $state_machine.jumpTable($id, [$([$ix (,) ...]) (,) ...], [$((count_states $task (0) { $body ... })) (,) ...]);
             }
-            tmp1.jumpToCase($c);
+            tmp1.jumpToCase($state_machine, $c);
             break;
             case $id2:
             step_state $task $state_machine $id {
