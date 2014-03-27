@@ -14,6 +14,7 @@
         "url": "git://github.com/srikumarks/cspjs.git"
     },
     "keywords": [
+        "sweet-macros",
         "macros",
         "javascript",
         "csp",
