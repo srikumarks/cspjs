@@ -4,7 +4,9 @@
 // with a value put into it will be called when the value
 // is consumed from the read end.
 
-var nextTick = setImmediate || process.nextTick;
+var nextTick = (function () {
+    return this.setImmediate || process.nextTick;
+}());
 
 function Channel() {
     this._queue = new Array;
