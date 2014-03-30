@@ -363,20 +363,28 @@ macro count_states {
     rule { $task $n  { switch ($x ...) { $(case $ix:lit (,) ... : { $body ... }) ... } $rest ... } } => {
         count_states $task $n { $($body ... phi $state_machine ;) ... $rest ... }
     }
-    rule { $task ($n ...) { $x:ident (,) ... <- chan $y ... ; $rest ... } } => {
-        count_states $task (2 $n ...) { $rest ... }
-    }
-    rule { $task ($n ...) { $x:ident (,) ... <- $y ... (); $rest ... } } => {
-        count_states $task (2 $n ...) { $rest ... }
-    }
-    rule { $task ($n ...) { $x:ident (,) ... <- $y ... ($args:expr (,) ...); $rest ... } } => {
-        count_states $task (2 $n ...) { $rest ... }
-    }
-    rule { $task ($n ...) { $step ... ; $rest ... } } => {
-        count_states $task (1 $n ...) { $rest ... }
+    rule { $task $n { $step ... ; $rest ... } } => {
+        count_states_line $task $n { $step ... ; } { $rest ... }
     }
     rule { $task ($n ...) { } } => { 
         sumup_counts ($n ...)
+    }
+}
+
+// BUG in sweetjs? Theoretically, it should be possible to merge these into the above
+// count_states macro itself, but only this separation works correctly!
+macro count_states_line {
+    rule { $task ($n ...) { $x:ident (,) ... <- chan $y ... ; } { $rest ... } } => {
+        count_states $task (2 $n ...) { $rest ... }
+    }
+    rule { $task ($n ...) { $x:ident (,) ... <- $y ... (); } { $rest ... } } => {
+        count_states $task (2 $n ...) { $rest ... }
+    }
+    rule { $task ($n ...) { $x:ident (,) ... <- $y ... ($args:expr (,) ...); } { $rest ... } } => {
+        count_states $task (2 $n ...) { $rest ... }
+    }
+    rule { $task ($n ...) { $step ... ; } { $rest ... } } => {
+        count_states $task (1 $n ...) { $rest ... }
     }
 }
 
