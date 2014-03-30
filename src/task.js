@@ -468,7 +468,7 @@ macro step_state_line_switch {
             tmp1.jumpToCase($state_machine, $c);
             break;
             case $id2:
-            step_state $task $state_machine $id {
+            step_state $task $state_machine $id2 {
                 $($body ... phi $state_machine ;) ...
                     $rest ...
             }
