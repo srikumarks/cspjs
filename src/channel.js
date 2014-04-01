@@ -548,6 +548,11 @@ function fanoutConnect() {
 }
 
 function fanoutDisconnect() {
+    if (arguments.length === 0) {
+        this._connections = [];
+        return this;
+    }
+
     var N, i, chan, pos;
     for (i = 0, N = arguments.length; i < N; ++i) {
         chan = arguments[i];
@@ -572,6 +577,7 @@ function fanoutStart() {
             }
         });
     }
+    return self;
 }
 
 module.exports = Channel;
