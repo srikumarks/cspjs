@@ -61,19 +61,24 @@ Channel.prototype.put = function (value, callback) {
 
 // For an end-point channel, applies the given
 // function to values received on the channel.
+// The second argument to the function is a callback
+// that should be called once the processing has completed.
+// It is alright to call the callback synchronously.
 // It only makes sense to have one processing function
 // for a channel. Any exceptions thrown are discarded.
+// The process function should return true to continue
+// processing or false to terminate processing.
 Channel.prototype.process = function (fn) {
     var self = this;
     function receive(err, value) {
-        try {
-            fn(value);
-        } catch (e) {
-            console.error(e);
-        }
-        self.take(receive);
+        fn(value, loop);
     }
-    self.take(receive);
+    function loop(err) {
+        if (!err) {
+            self.take(receive);
+        }
+    }
+    loop(null);
     return this;
 };
 
