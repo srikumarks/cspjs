@@ -497,4 +497,58 @@ function expiringPut(value, callback) {
     return this;
 }
 
+// Makes a "fanout" channel that can be "connect()"ed to
+// other channels to whom the values that come on this channel
+// will be copied. Do not call a fanout channel's "take" method
+// explicitly. Instead connect other channels to it to receive
+// values. Since it may take time to setup connections, you have
+// to call ch.start() explicitly to begin piping values to the
+// connections, lest some values get missed out.
+
+Channel.prototype.fanout = function () {
+    var ch = Object.create(this);
+    ch.connect      = fanoutConnect;
+    ch.disconnect   = fanoutDisconnect;
+    ch.start        = fanoutStart;
+    ch._channel     = this;
+    ch._connections = [];
+    ch._started     = false;
+    return ch;
+};
+
+function fanoutConnect() {
+    for (var i = 0, N = arguments.length; i < N; ++i) {
+        this.disconnect(arguments[i]);
+        this._connections.push(arguments[i]);
+    }
+    return this;
+}
+
+function fanoutDisconnect() {
+    var N, i, chan, pos;
+    for (i = 0, N = arguments.length; i < N; ++i) {
+        chan = arguments[i];
+        pos = this._connections.indexOf(chan);
+        if (pos >= 0) {
+            this._connections.splice(pos, 1);
+        }
+    }
+    return this;
+}
+
+function fanoutStart() {
+    var self = this;
+    if (!self._started) {
+        self._started = true;
+        self.take(function receive(err, value) {
+            if (value !== null) {
+                for (var i = 0, N = self._connections.length; i < N; ++i) {
+                    self._connections[i].put(value);
+                }
+                self.take(receive);
+            }
+        });
+    }
+}
+
 module.exports = Channel;
