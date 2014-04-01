@@ -418,19 +418,23 @@ Channel.prototype.debounce = function (ms) {
     var ch = Object.create(this);
     ch._channel = this;
     ch._debounceInterval_ms = ms;
-    ch._lastPutTime = 0;
+    ch._timer = null;
     ch.put = debouncingPut;
     return ch;
 };
 
+function realPut(ch, value, callback) {
+    ch._channel.put(value, callback);
+    ch._timer = null;
+}
+
 function debouncingPut(value, callback) {
-    var now = Date.now();
-    if (now - this._lastPutTime >= this._debounceInterval_ms) {
-        this._lastPutTime = now;
-        this._channel.put(value, callback);
-    } else {
-        sendValue(null, callback);
+    if (this._timer) {
+        clearTimeout(this._timer);
+        this._timer = null;
     }
+    this._timer = setTimeout(realPut, this._debounceInterval_ms, this, value, callback);
+    return this;
 }
 
 
