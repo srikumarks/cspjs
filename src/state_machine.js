@@ -123,7 +123,11 @@ StateMachine.prototype.unwind = function () {
             this.restoreStateVars(where.restoreState);
             this.unwind();
         } else if (where.phi) {
-            this.goTo(where.phi);
+            if (this.state.err) {
+                nextTick(this.boundUnwind);
+            } else {
+                this.goTo(where.phi);
+            }
         } else if (where.isError) {
             if (this.state.err) {
                 this.state.currentErrorStep = where;
