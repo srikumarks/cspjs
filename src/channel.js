@@ -248,14 +248,27 @@ function noop() {}
 // once `fill` is called somewhere, `take` will always
 // succeed with a single value.
 Channel.prototype.fill = function (value) {
+    if (this._pending.length > 0) {
+        throw new Error('Channel::fill cannot be used after Channel::put has been called');
+    }
+
+    var origPut = this.put;
+
     this.take = function (callback) {
         sendValue(value, callback);
     };
     this.put = function (ignoredValue, callback) {
-        // no-op
-        sendValue(value, callback);
+        sendError('filled', callback);
     };
     this.fill = noop;
+
+    // If takers are already waiting, satisfy them
+    // immediately.
+    while (this._queue.length > 0) {
+        origPut.call(this, value);
+    }
+
+    return this;
 };
 
 // Sends the elements of the given array one by one
