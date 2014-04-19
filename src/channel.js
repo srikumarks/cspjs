@@ -14,6 +14,11 @@ function Channel() {
     return this;
 }
 
+// Convenience class method to instantiate a channel.
+Channel.new = function () {
+    return new Channel();
+};
+
 function sendValue(value, callback) {
     callback && nextTick(function () { callback(null, value); });
 }
@@ -79,6 +84,56 @@ Channel.prototype.process = function (fn) {
         }
     }
     loop(null);
+    return this;
+};
+
+// Binds a channel to the given named method of the given
+// class. If the class has an init() method, it will be called
+// with `options.initArgs` to instantiate an object.
+// The given `options.methodName` of the resultant object will be 
+// invoked with the message as the first argument, and a continuation
+// callback (a la `process()`) as the second argument. The methodName
+// defaults to `receive`.
+//
+// If `options.spawn` is `true`, then the handler is called with the
+// message only and the channel returns to processing other
+// messages immediately without waiting for the handling to
+// finish.
+//
+// Calling bind on an already bound channel replaces the previous binding.
+Channel.prototype.bind = function (klass, options) {
+    var self = this, receive, loop;
+    self._boundClass = klass;
+    self._boundMethodName = (options && options.methodName) || 'receive';
+    self._boundInitArgs = (options && options.initArgs) || [];
+    self._boundSpawn = (options && options.spawn) || false;
+    if (!self._bound) {
+        receive = function (err, msg) {
+            var handler = new self._boundClass(); // new is not expected to throw.
+            if (handler.init) {
+                try {
+                    handler = handler.init.apply(handler, self._boundInitArgs);
+                } catch (e) {
+                    return loop(err);
+                }
+            }
+            if (self._boundSpawn) {
+                nextTick(loop);
+                handler[self._boundMethodName](msg);
+            } else {
+                handler[self._boundMethodName](msg, loop);
+            }
+        };
+        loop = function (err) {
+            if (!err) {
+                self.take(receive);
+            } else {
+                self._bound = false;
+            }
+        };
+        self._bound = true;
+        loop(null);
+    }
     return this;
 };
 
