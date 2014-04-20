@@ -467,8 +467,8 @@ Channel.prototype.debounce = function (ms) {
 };
 
 function realPut(ch, value, callback) {
-    ch._channel.put(value, callback);
     ch._timer = null;
+    ch._channel.put(value, callback);
 }
 
 function debouncingPut(value, callback) {

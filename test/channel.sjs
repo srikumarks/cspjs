@@ -112,7 +112,7 @@ describe('Channel', function () {
             <- chan Channel.timeout(200);
             ch.put(300);
             x <- chan ch;
-            assert.equal(x, 100);
+            assert.equal(x, 200);
             x <- chan ch;
             assert.equal(x, 300);
         });
@@ -166,6 +166,58 @@ describe('Channel', function () {
             await ch.put(7);
             await ch.put(8);
             assert.deepEqual(x, [3,4,5,6]);
+        });
+    });
+
+    describe('#map()', function () {
+        it('should apply given transformation to values on the channel', task {
+            var ch = new Channel(), ch2 = ch.map(function (x) { return x * x; });
+            ch.put(1);
+            ch.put(2);
+            ch.put(3);
+            ch.put(4);
+            squares <- ch2.takeN(4);
+            assert.deepEqual(squares, [1,4,9,16]);
+        });
+    });
+
+    describe('#reduce()', function () {
+        it('should apply given reduction to values on the channel', task {
+            var ch = new Channel(), ch2 = ch.reduce(0, function (sum, x) { return sum + x; });
+            ch.put(1);
+            ch.put(2);
+            ch.put(3);
+            ch.put(4);
+            sum <- ch2.takeN(4);
+            assert.deepEqual(sum, [1,3,6,10]);
+        });
+    });
+    
+    describe('#filter()', function () {
+        it('should only pass on values that satisfy the filter', task {
+            var ch = new Channel(), ch2 = ch.filter(function (x) { return x % 2 === 1; });
+            ch.put(1);
+            ch.put(2);
+            ch.put(3);
+            ch.put(4);
+            ch.put(5);
+            ch.put(6);
+            values <- ch2.takeN(3);
+            assert.deepEqual(values, [1,3,5]);
+        });
+    });
+
+    describe('#group()', function () {
+        it('should group values', task {
+            var ch = new Channel(), ch2 = ch.group(3);
+            ch.put(1);
+            ch.put(2);
+            ch.put(3);
+            ch.put(4);
+            ch.put(5);
+            ch.put(6);
+            values <- ch2.takeN(2);
+            assert.deepEqual(values, [[1,2,3],[4,5,6]]);
         });
     });
 });
