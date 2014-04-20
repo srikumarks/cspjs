@@ -175,98 +175,72 @@ Channel.prototype.backlog = function () {
 
 // Makes a new channel whose values are transformed by the given
 // function "f". `cond(value)` is a function that specifies a 
-// condition until which the mapping will continue.
-Channel.prototype.map = function (cond, f) {
-    var ch2 = new Channel();
-    var self = this;
-    function receive(err, value) {
-        if (cond === true || cond(value)) {
-            ch2.put(f(value), loop);
-        } else {
-            ch2.put(null);
-        }
-    }
-    function loop() {
-        self.take(receive);
-    }
-    loop();
+// condition until which the mapping will continue. The mapper
+// is not expected to throw.
+Channel.prototype.map = function (f) {
+    var ch2 = Object.create(this);
+    var take = this.take;
+    ch2.take = function (callback) {
+        take.call(this, function (err, value) {
+            callback(err, err ? null : f(value));
+        });
+    };
     return ch2;
 };
 
 // Makes a new channel and pipes the values in this
 // channel to it. Only the values that satisfy the
 // predicate function 'f' are piped and others
-// are dropped. 'cond(value)' gives the condition
-// until which the piping will continue to run.
-Channel.prototype.filter = function (cond, f) {
-    var ch2 = new Channel();
-    var self = this;
-    function receive(err, value) {
-        if (cond === true || cond(value)) {
-            if (f(value)) {
-                ch2.put(value, loop);
+// are dropped. The filter function is not expected
+// to throw.
+Channel.prototype.filter = function (f) {
+    var ch2 = Object.create(this);
+    var take = this.take;
+    ch2.take = function (callback) {
+        take.call(this, function (err, value) {
+            if (err) { 
+                callback(err, null); 
+            } else if (f(value)) {
+                callback(err, value);
             } else {
-                loop();
+                ch2.take(callback); // Value dropped
             }
-        } else {
-            ch2.put(null);
-        }
-    }
-    function loop() {
-        self.take(receive);
-    }
-    loop();
+        });
+    };
     return ch2;
 };
 
 // Makes a new channel, reduces the values produced
-// by this channel using the function "f" as long
-// as "cond()" is satisfied and once all folding is done,
-// sends the result to the new channel.
-Channel.prototype.reduce = function (initial, cond, f) {
-    var ch2 = new Channel();
-    var self = this;
+// continuously and sends the output to the taker.
+// The reducer is not expected to throw.
+Channel.prototype.reduce = function (initial, f) {
+    var ch2 = Object.create(this);
+    var take = this.take;
     var result = initial;
-    function receive(err, value) {
-        result = f(result, value);
-        loop();
-    }
-    function loop() {
-        if (cond()) {
-            self.take(receive);
-        } else {
-            ch2.put(result);
-        }
-    }
-    loop();
+    ch2.take = function (callback) {
+        take.call(this, function (err, value) {
+            if (err) {
+                callback(err, null);
+            } else {
+                result = f(result, value);
+                callback(null, result);
+            }
+        });
+    };
     return ch2;
 };
 
 // Makes a new channel and pipes the values put into this
 // channel in groups of N. 
 Channel.prototype.group = function (N) {
-    var gch = new Channel();
-    var group = [];
-    var self = this;
-
-    function receive(err, value) {
-        group.push(value);
-        if (group.length < N) {
-            loop();
-        } else {
-            var g = group;
-            group = [];
-            gch.put(g, loop);
-        }
+    if (N <= 0) {
+        throw new Error('Groups need to be at least 1 in size. Given "' + N + '"');
     }
-
-    function loop() {
-        self.take(receive);
-    }
-
-    loop();
-    return gch;
+    return this.reduce([], function (group, value) {
+        return (group.length === N) ? [value] : (group.push(value), group);
+    }).filter(function (g) { return g.length === N; });
 };
+
 
 // Temporarily switches the channel to a mode where it will
 // collect the next N items into a group and pass it on to
@@ -400,10 +374,11 @@ function MergedChannelValue(i, ch, err, value) {
 // that has three fields - "chan" giving the channel that 
 // produced the value, "val" giving the value and "ix" 
 // giving the index of the channel in the array that produced
-// the value. If any of the source channels callback with
-// an err (which is never supposed to happen) or "null" value 
-// (which can happen), the channel will cease to send its output
-// to the merged channel.
+// the value. The merged channel will received a wrapped object
+// that will pass on both values as well as errors from the
+// channels being merged. This permits custom error handling instead
+// of triggering error propagation in the receiver for every
+// channel's error. Not all errors and channels need be equal.
 Channel.merge = function (channels) {
     var channel = new Channel();
 
