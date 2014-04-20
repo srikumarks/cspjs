@@ -122,6 +122,8 @@ StateMachine.prototype.unwind = function () {
         if (where.restoreState) {
             this.restoreStateVars(where.restoreState);
             this.unwind();
+        } else if (where.retry) {
+            this.goTo(where.retry);
         } else if (where.phi) {
             if (this.state.err) {
                 nextTick(this.boundUnwind);
@@ -194,7 +196,7 @@ StateMachine.prototype.retry = function () {
     // point. And of course, we also restore the error step description
     // object on the unwind stack so that the surrounding catch block will
     // attempt to handle any new errors that may occur.
-    this.state.unwinding.splice(errorStep.unwindPoint, 0, errorStep, {phi: errorStep.retryStep});
+    this.state.unwinding.splice(errorStep.unwindPoint, 0, errorStep, {retry: errorStep.retryStep});
 
     // Enter a "no error" state.
     this.state.currentErrorStep = null;
