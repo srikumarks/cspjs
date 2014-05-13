@@ -163,6 +163,19 @@ describe('errors', function () {
     });
 
     describe('finally_block', function () {
+        it('must unwind in reverse order on normal return', task {
+            var subtask = task {
+                var arr = [];
+                finally { arr.push(1); }
+                finally { arr.push(2); }
+                finally { arr.push(3); }
+                return arr;
+            };
+
+            arr <- subtask();
+            assert.deepEqual(arr, [3,2,1]);
+        });
+
         it('must unwind in reverse order', task {
             var arr = [];
             catch (e) {
