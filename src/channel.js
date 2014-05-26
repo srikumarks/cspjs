@@ -64,15 +64,67 @@ Channel.prototype.put = function (value, callback) {
     }
 };
 
+// Does any ending actions on the channel.
+// The protocol is to have a channel "end"
+// by a null value being placed on it. The
+// end() method is simply to perform any pending 
+// ending actions. The default action is to replace
+// the end() function with the original end.
+Channel.prototype.end = function end() {
+    this.end = end;
+};
+
+// Returns a channel that will give you values that come
+// on this channel, without actually reading from the channel.
+// That is, multiple taps on a channel will get its values
+// fanned out. If a channel argument is given, the tapped
+// values will go into that channel.
+Channel.prototype.tap = function (chan) {
+    var tapChan = chan || new Channel();
+    var self = this;
+    if (!this._taps) {
+        this._taps = [tapChan];
+        var put = this.put;
+        this.put = function (value, callback) {
+            for (var c = 0, cN = this._taps.length; c < cN; ++c) {
+                this._taps[c].put(value);
+            }
+            if (value === null) {
+                while (this._taps.length > 0) {
+                    this._taps[0].end();
+                }
+                this._taps = null;
+                this.put = put;
+            }
+            if (this._pending.length > 0) {
+                // Put only if there are takers. Otherwise
+                // just drop the value. If we don't do this,
+                // the value will simply pile up if only taps
+                // are being used on the channel.
+                put.call(this, value, callback);
+            }
+        };
+    } else {
+        this._taps.push(tapChan);
+    }
+
+    var end = tapChan.end;
+    tapChan.end = function () {
+        self._taps.splice(self._taps.indexOf(tapChan), 1);
+        end.call(this);
+    };
+    return tapChan;
+};
+
 // For an end-point channel, applies the given
 // function to values received on the channel.
 // The second argument to the function is a callback
 // that should be called once the processing has completed.
 // It is alright to call the callback synchronously.
 // It only makes sense to have one processing function
-// for a channel. Any exceptions thrown are discarded.
-// The process function should return true to continue
-// processing or false to terminate processing.
+// for a channel. The fn is called with the value as the
+// first argument and a loop continuation callback as
+// the second argument.
 Channel.prototype.process = function (fn) {
     var self = this;
     function receive(err, value) {
@@ -267,6 +319,29 @@ Channel.prototype.takeN = function (N, callback) {
     self.take(receive);
 };
 
+// Keeps this channel alive until a value is
+// received from the given chan.
+Channel.prototype.until = function (chan) {
+    var done = false;
+    var self = this;
+    var tapChan = chan.tap();
+    tapChan.take(function (err, value) {
+        done = true;
+        tapChan.end();
+        self.end();
+    });
+    var ch = this.tap();
+    var take = ch.take;
+    ch.take = function (callback) {
+        if (done) {
+            sendValue(null, callback);
+        } else {
+            take.call(this, callback);
+        }
+    };
+    return ch;
+};
+
 function noop() {}
 
 // Switches the channel to a state where every time some
@@ -358,6 +433,15 @@ Channel.prototype.listen = function (domElement, eventName) {
     for (var i = 0, N = elements.length; i < N; ++i) {
         elements[i].addEventListener(eventName, listener);
     }
+
+    var end = this.end;
+    this.end = function () {
+        for (var i = 0, N = elements.length; i < N; ++i) {
+            elements[i].removeEventListener(eventName, listener);
+        }
+        end.call(this);
+    };
+    return this;
 };
 
 function MergedChannelValue(i, ch, err, value) {
