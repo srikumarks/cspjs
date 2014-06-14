@@ -11,6 +11,9 @@ prominence of the CSP model, I'm quite sure there are many like me who want to
 use the CSP model with Javascript without having to switch to another language
 entirely.
 
+**UPDATE:** See [blog post](http://sriku.org/blog/2014/02/11/bye-bye-js-promises/) 
+describing error management scheme in detail.
+
 [Haskell]: http://www.haskell.org
 [Erlang]: http://erlang.org
 [Go]: http://golang.org
