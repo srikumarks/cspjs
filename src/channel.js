@@ -444,8 +444,7 @@ Channel.prototype.listen = function (domElement, eventName) {
     return this;
 };
 
-function MergedChannelValue(i, ch, err, value) {
-    this.ix = i;
+function MergedChannelValue(ch, err, value) {
     this.chan = ch;
     this.err = err;
     this.val = value;
@@ -463,20 +462,36 @@ function MergedChannelValue(i, ch, err, value) {
 // channels being merged. This permits custom error handling instead
 // of triggering error propagation in the receiver for every
 // channel's error. Not all errors and channels need be equal.
+//
+// Breaking change: MergedChannelValue no longer has an 'ix'
+// field giving the index within the array. You need to branch on
+// the channel itself. Alternatively, you can store some reference
+// value as a property of the channel object any way. The reason
+// for this change is that now the "piper" function is exposed
+// as the .add() method of the merged channel, to enable addition
+// of new channels to the merged stream on the fly. To remove
+// a channel from a merged stream, simply send a null value
+// to it.
 Channel.merge = function (channels) {
     var channel = new Channel();
 
-    function piper(ch, i) {
+    function piper(ch) {
         function writer(err, value) {
-            channel.put(new MergedChannelValue(i, ch, err, value), reader);
+            if (value !== null) {
+                channel.put(new MergedChannelValue(ch, err, value), reader);
+            } else {
+                // Indicate that the channel is finished. The reader can discard this.
+                channel.put(new MergedChannelValue(ch, null, null));
+            }
         }
         function reader(err, value) {
             ch.take(writer);
         }
-        reader(null, null);
+        reader(null, true);
     }
 
-    channels.forEach(piper);
+    channel.add = piper;
+    channels && channels.forEach(piper);
 
     return channel;
 };

@@ -95,11 +95,11 @@ describe('Channel', function () {
             var chs = [100, 50, 200].map(Channel.timeout);
             var chm = Channel.merge(chs);
             x <- chan chm;
-            assert.equal(x.ix, 1);
+            assert.equal(x.chan, chs[1]);
             x <- chan chm;
-            assert.equal(x.ix, 0);
+            assert.equal(x.chan, chs[0]);
             x <- chan chm;
-            assert.equal(x.ix, 2);
+            assert.equal(x.chan, chs[2]);
         });
     });
 
