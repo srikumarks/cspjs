@@ -200,13 +200,13 @@ macro declare_state_variables {
     rule { $task $state_machine $fin $vars { while ($x ...) { $body ... }  $rest ... } } => {
         declare_state_variables $task $state_machine $fin $vars { $body ... $rest ... }
     }
-    rule { $task $state_machine $fin $vars { finally $cleanup ... ($args:expr (,) ...) ; $rest ... } } => {
-        declare_state_variables $task $state_machine $fin $vars { $rest ... }
-    }
     // If a finally block is encountered somewhere in the body, then we
     // need to be able to save and restore state variables. So keep track of that.
     rule { $task $state_machine $fin $vars { finally { $cleanup ... } $rest ... } } => {
         declare_state_variables $task $state_machine 1 $vars { $cleanup ... $rest ... }
+    }
+    rule { $task $state_machine $fin $vars { finally $cleanup ... ($args:expr (,) ...) ; $rest ... } } => {
+        declare_state_variables $task $state_machine $fin $vars { $rest ... }
     }
     rule { $task $state_machine $fin $vars { catch ($eclass:ident $e:ident) { $handler ... } $rest ... } } => {
         declare_state_variables $task $state_machine $fin $vars { var $e = null ; $handler ... $rest ... }
@@ -351,11 +351,11 @@ macro count_states {
     rule { $task ($n ...) { while ($x ...) { $body ... } $rest ... } } => {
         count_states $task (2 $n ...) { $body ... $rest ... }
     }
-    rule { $task ($n ...) { finally $cleanup ... ($args:expr (,) ...) ; $rest ... } } => {
-        count_states $task (1 $n ...) { $rest ... }
-    }
     rule { $task ($n ...) { finally { $cleanup ... } $rest ... } } => {
         count_states $task (2 $n ...) { $cleanup ... $rest ... }
+    }
+    rule { $task ($n ...) { finally $cleanup ... ($args:expr (,) ...) ; $rest ... } } => {
+        count_states $task (1 $n ...) { $rest ... }
     }
     rule { $task ($n ...) { catch ($e ...) { $handler ... } $rest ... } } => {
         count_states $task (2 $n ...) { $handler ... $rest ... }
