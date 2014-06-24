@@ -607,6 +607,7 @@ function bufferedTake(callback) {
     if (this.backlog() >= this._bufferLength) {
         var q = this._queue[this._bufferLength - 1];
         sendValue(q._value, q._callback);
+        q._callback = null;
     }
 }
 
