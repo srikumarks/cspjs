@@ -76,8 +76,9 @@ StateMachine.prototype.start = function () {
 StateMachine.prototype.step = function () {
     this.state.waiting--;
     if (this.state.abort_with_error) {
+        var err = this.state.abort_with_error;
         this.state.abort_with_error = null;
-        return this.fn.call(this.context, this.state.abort_with_error);
+        return this.fn.call(this.context, err);
     }
     this.fn.apply(this.context, this.state.args);
 };
