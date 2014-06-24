@@ -304,11 +304,11 @@ macro step_state {
     rule { $task $state_machine $id { while ($x ...) { $body ... }  $rest ... } } => {
         step_state_line_while $task $state_machine $id { while ($x ...) { $body ... } } { $rest ... }
     }
-    rule { $task $state_machine $id { finally $cleanup ... ($args:expr (,) ...) ;  $rest ... } } => {
-        step_state_line_finally_expr $task $state_machine $id { finally $cleanup ... ($args (,) ...) ; } { $rest ... }
-    }
     rule { $task $state_machine $id { finally { $cleanup ... }  $rest ... } } => {
         step_state_line_finally_block $task $state_machine $id { finally { $cleanup ... } } { $rest ... }
+    }
+    rule { $task $state_machine $id { finally $cleanup ... ($args:expr (,) ...) ;  $rest ... } } => {
+        step_state_line_finally_expr $task $state_machine $id { finally $cleanup ... ($args (,) ...) ; } { $rest ... }
     }
     rule { $task $state_machine $id { catch ($x ...) { $handler ... }  $rest ... } } => {
         step_state_line_catch $task $state_machine $id { catch ($x ...) { $handler ... } } { $rest ... }
