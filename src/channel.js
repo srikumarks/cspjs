@@ -611,6 +611,59 @@ function bufferedTake(callback) {
     }
 }
 
+// Every time a bucket's level falls below the low water mark,
+// it waits for the bucket to get full again before delivering
+// values to the takers. This is useful when values are expected
+// to arrive at a channel roughly periodically, but the rate at 
+// which they get processed can fluctuate a bit. The buffering 
+// helps with the fluctuation and the "low water mark" helps ensure
+// maintenance of the buffer.
+Channel.prototype.bucket = function (fullSize, lowWaterMark) {
+    var ch = Object.create(this);
+    ch._channel = this;
+    ch._bufferLength = fullSize;
+    ch._bucketLowWaterMark = lowWaterMark || 0;
+    ch._suspendedTakes = [];
+    ch.waitingTillFull = true;
+    ch.take = bucketTake;
+    ch.put = bucketPut;
+    return ch;
+};
+
+function bucketProcSuspendedTakes(bucket) {
+    while (bucket._suspendedTakes.length > 0) {
+        bufferedTake.call(bucket, bucket._suspendedTakes.shift());
+    }
+    bucket.waitingTillFull = bucket.backlog() <= bucket._bucketLowWaterMark;
+}
+
+function bucketTake(callback) {
+    if (this.waitingTillFull) {
+        if (this.backlog() > this._bufferLength) {
+            // Full reached.
+            this.waitingTillFull = false;
+            this.take(callback);
+        } else {
+            this._suspendedTakes.push(callback);
+        }
+    } else {
+        this._suspendedTakes.push(callback);
+        bucketProcSuspendedTakes(this);
+    }
+}
+
+function bucketPut(value, callback) {
+    bufferedPut.call(this, value, callback);
+    if (this.waitingTillFull) {
+        if (this.backlog() > this._bufferLength) {
+            // Full reached.
+            bucketProcSuspendedTakes(this);
+        }
+    } else {
+        bucketProcSuspendedTakes(this);
+    }
+}
+
 
 // If more than N values have been placed into a channel
 // and a writer tries to place one more value, sometimes
