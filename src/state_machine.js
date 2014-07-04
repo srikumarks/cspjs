@@ -76,11 +76,18 @@ StateMachine.prototype.start = function () {
 StateMachine.prototype.step = function () {
     this.state.waiting--;
     if (this.state.abort_with_error) {
-        var err = this.state.abort_with_error;
-        this.state.abort_with_error = null;
-        return this.fn.call(this.context, err);
+        this.performAbort();
+    } else {
+        this.fn.apply(this.context, this.state.args);
     }
-    this.fn.apply(this.context, this.state.args);
+};
+
+// If an abortion has been requested by the state machine
+// user, then bail out on the next step.
+StateMachine.prototype.performAbort = function () {
+    var err = this.state.abort_with_error;
+    this.state.abort_with_error = null;
+    this.fn.call(this.context, err);
 };
 
 StateMachine.prototype.goTo = function (id) {
@@ -97,13 +104,14 @@ StateMachine.prototype.thenTo = function (id) {
         var _self = self;
         var _state = _self.state;
         _state.waiting--;
-        if (_state.abort_with_error) {
-            return _self.fn.call(_self.context, _state.abort_with_error);
-        }
         if (!done) {
             done = true;
             _state.id = id;
-            _self.fn.apply(_self.context, arguments); 
+            if (_state.abort_with_error) {
+                _self.performAbort();
+            } else {
+                _self.fn.apply(_self.context, arguments); 
+            }
         } else {
             console.error('Callback called repeatedly!');
         }
