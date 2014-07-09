@@ -319,6 +319,15 @@ Channel.prototype.takeN = function (N, callback) {
     self.take(receive);
 };
 
+// Takes as many values as it can without blocking.
+Channel.prototype.takeSome = function (callback) {
+    var bl = this.backlog();
+    if (bl > 0) {
+        return this.takeN(bl, callback);
+    }
+    sendValue([], callback);
+};
+
 // Keeps this channel alive until a value is
 // received from the given chan.
 Channel.prototype.until = function (chan) {
