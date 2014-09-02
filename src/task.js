@@ -442,20 +442,25 @@ macro step_state_line_switch {
     //
     // `switch (expr) { case 0: { ... } case 1: { ... }}` can be used to manage
     // coordination of multiple tasks. The `expr` is an expression whose value
-    // is matched with the case literals to decide where to branch.  You can,
-    // for example, branch based on the object yielded by a merged channel by
-    // looking at the 'ix' property of the object. The `case` blocks don't 
-    // need any break statements and won't bleed from one to the next.
+    // is matched with the case literals to decide where to branch.  The value 
+    // coming in on such a "merged channel" has a `chan` property that gives
+    // the channel itself that produced the value and a `val` property containing
+    // the value. You can attach identifiers to your channels and switch based
+    // on them, or you can using `===` tests on the channels themselves.
     //
     // There MUST be one `case` clause for each channel in the merge list, or
     // an error will be raised at runtime.
     //
     // You'd use `switch` like this -
     //      
-    //      mch = Channel.merge([ch1, ch2, ... chN]); // Or any equivalent thing to get `x`.
+    //      function addIndex(chan, ix) {
+    //          chan.ix = ix;
+    //          return chan;
+    //      }
+    //      mch = Channel.merge([ch1, ch2, ... chN].map(addIndex));
     //      while (true) {
     //          x <- chan mch;
-    //          switch (x.ix) {
+    //          switch (x.chan.ix) {
     //              case 0: { ... x.val ... }
     //              case 1: { ... x.val ... }
     //          }
@@ -510,15 +515,16 @@ macro step_state_line_while {
 // ### Exception mechanism
 //
 // Error handling inside tasks uses a different and more expressive form of
-// exceptions. There is no `try` clause since any statement may throw an exception
-// that will be forwarded to the callback provided to the task.
+// exceptions. There is no `try` clause since any statement may throw an
+// exception that will be forwarded to the callback provided to the task.
 //
-// `finally` statements/blocks can be placed anywhere and will register
-// actions to be executed before a) reaching the catch clause immediately
-// above or b) returning from the task normally. These statements/blocks execute
-// in the order opposite to the order in which they were encountered during running.
-// If these occur within a loop, then the statements/blocks will execute as many
-// times as the loop did. (So be aware of what you want to be cleaned up.)
+// `finally` statements/blocks can be placed anywhere and will register actions
+// to be executed before a) reaching the catch clause immediately above or b)
+// exiting the block in which they occur. These statements/blocks execute in
+// the order opposite to the order in which they were encountered during
+// running.  If these occur within a loop, then the statements/blocks will
+// execute as many times as the loop did, once for every loop iteration. (So be
+// aware of what you want to be cleaned up.)
 
 // `finally funcExpr(args...);` statement causes the `funcExpr` and `args...` to be evaluated
 // at the time the statement is encountered, but defers the call itself to be made at unwinding
@@ -578,11 +584,12 @@ macro step_state_line_finally_block {
 }
 
 // `catch (e) { ... }` blocks will catch all exceptions thrown by statements
-// that follow the block, bind the error to `e` and run the sequence of statements
-// within the `{...}`.
+// that follow the block up to the end of the block's scope, bind the error
+// to `e` and run the sequence of statements within the `{...}`.
 //
-// `catch (ErrorClass e) {...}` will catch and handle only those errors `e` that satisfy
-// `e instanceof ErrorClass`. Other errors propagate up to catch clauses above.
+// `catch (ErrorClass e) {...}` will catch and handle only those errors `e`
+// that satisfy `e instanceof ErrorClass`. Other errors propagate up to catch
+// clauses above.
 
 macro step_state_line_catch {
     case { $me $task $state_machine $id { catch ($eclass:ident $e:ident) { $handler ... } } { $rest ... } } => {
@@ -733,10 +740,13 @@ macro step_state_line {
 
     // ### Returning values from a task
     //
-    // `return x, y, ...;` will result in the task winding back up any `finally`
-    // actions and then providing the given values to the next task by calling
-    // the last callback argument to the task. Such a statement will, obviously,
-    // return from within any block within control structures.
+    // `return x, y, ...;` will result in the task winding back up any
+    // `finally` actions and then providing the given values to the next task
+    // by calling the last callback argument to the task. Such a statement
+    // will, obviously, return from within any block within control structures.
+    //
+    // Though you can return from anywhere in this implementation, don't return
+    // from within finally clauses.
 
     case { $me $task $state_machine $id { return $x:expr (,) ... ; } { $rest ... } } => {
         var id = unwrapSyntax(#{$id});
@@ -757,7 +767,9 @@ macro step_state_line {
     //
     // Hack: "throw object.err;" can be used as a short hand for
     // "if (object.err) { throw object.err; }". i.e. the error is thrown
-    // only if it is not null or undefined or false.
+    // only if it is not null or undefined or false. This fits with Node.js's
+    // callback convention where `err === null` tests whether there is an
+    // error or not. So throwing a `null` doesn't make sense.
 
     case { $me $task $state_machine $id { throw $e:expr ; } { $rest ... } } => {
         var id = unwrapSyntax(#{$id});
@@ -774,7 +786,9 @@ macro step_state_line {
     // ### Retrying a failed operation.
     //
     // Within a catch block, you can use the retry statement 
+    //
     //      retry;
+    // 
     // to jump control again to the beginning of the code that
     // the catch block traps errors for ... which is immediately
     // after the ending brace of the catch block.
