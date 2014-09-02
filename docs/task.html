@@ -774,7 +774,9 @@ aware of what you want to be cleaned up.)</p>
               <p><code>finally funcExpr(args...);</code> statement causes the <code>funcExpr</code> and <code>args...</code> to be evaluated
 at the time the statement is encountered, but defers the call itself to be made at unwinding
 time.</p>
-<p>TODO: Support method calls as well.</p>
+<p><code>finally obj.method(args...);</code> is also a supported form. The <code>obj</code> and <code>args</code> are evaluated
+when the <code>finally</code> statement is encountered, but the call itself is performed at cleanup time
+(obviously).</p>
 
             </div>
             

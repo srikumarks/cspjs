@@ -7,7 +7,7 @@ by [Promises/A+][] or even generators.
 
 Apart from tasks and channels, cspjs attempts at a saner and more expressive
 error handling mechanism than the traditional try-catch-finally model.  See
-[blog post][errman] describing the error error management scheme in detail.
+[blog post][errman] describing the error management scheme in detail.
 
 ## How do I use it?
 
@@ -124,6 +124,7 @@ entirely.
 [task]: https://github.com/srikumarks/cspjs/blob/master/src/task.js
 [Channel]: https://github.com/srikumarks/cspjs/blob/master/src/channel.js
 [errman]: http://sriku.org/blog/2014/02/11/bye-bye-js-promises/
+[Node.js]: http://nodejs.org
 
 
 So, what did I do? I wrote a [sweetjs] macro named [task] and a support library

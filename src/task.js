@@ -530,7 +530,9 @@ macro step_state_line_while {
 // at the time the statement is encountered, but defers the call itself to be made at unwinding
 // time.
 //
-// TODO: Support method calls as well.
+// `finally obj.method(args...);` is also a supported form. The `obj` and `args` are evaluated
+// when the `finally` statement is encountered, but the call itself is performed at cleanup time
+// (obviously).
 
 macro step_state_line_finally_expr {
     case { $me $task $state_machine $id { finally $cleanup ... . $methId:ident ($arg:expr (,) ...) ; } { $rest ... } } => {
