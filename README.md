@@ -1,85 +1,24 @@
 # task - a sweetjs macro for CSP in Javascript
 
-My brain doesn't think well with promises. Despite that, [bluebird] is a
-fantastic implementation of the [Promises/A+] spec and then some, that many in
-the community are switching to promises wholesale.
+The [task] macro, in conjunction with [Channel] objects lets you write CSP-ish
+code in Javascript that can interop with [Node.js]'s callback mechanism. This
+came out of a need for a better way to deal with async activities than offered
+by [Promises/A+][] or even generators.
 
-So what *does* my brain think well with? The kind of "communicating sequential
-processes" model used in [Haskell], [Erlang] and [Go] works very well with my
-brain. Also [clojure]'s [core.async] module uses this approach. Given this
-prominence of the CSP model, I'm quite sure there are many like me who want to
-use the CSP model with Javascript without having to switch to another language
-entirely.
-
-**UPDATE:** See [blog post](http://sriku.org/blog/2014/02/11/bye-bye-js-promises/) 
-describing error management scheme in detail.
-
-[Haskell]: http://www.haskell.org
-[Erlang]: http://erlang.org
-[Go]: http://golang.org
-[clojure]: http://clojure.org
-[core.async]: https://github.com/clojure/core.async
-[Promises/A+]: http://promises-aplus.github.io/promises-spec/
-[bluebird]: https://github.com/petkaantonov/bluebird
-
-So, what did I do? I wrote a [sweetjs] macro named
-[task](https://github.com/srikumarks/cspjs/blob/master/src/task.js) and a
-support library for channels that provides this facility using as close to JS
-syntax as possible.  It compiles CSP-style code into a pure-JS (ES5) state
-machine. The code looks similar to generators and when generator support is
-ubiquitous the macro can easily be implemented to write code using them.
-However, for the moment, generators are not ubiquitous on the browser side and
-it helps to have good async facilities there too. 
-
-No additional wrappers are needed to work with NodeJS-style callbacks since a
-"task" compiles down to a pure-JS function which takes a NodeJS-style callback
-as the final argument.
-
-[sweetjs]: http://sweetjs.org/
-
-## Show me the code already!
-
-1. Compare [task/doxbee-sequential] and [bluebird/doxbee-sequential] for the
-   `doxbee-sequential` benchmark. 
-2. Compare [task/doxbee-sequential-errors] and
-   [bluebird/doxbee-sequential-errors] for the `doxbee-sequential-errors`
-   benchmark.
-3. Compare [task/madeup-parallel] and [bluebird/madeup-parallel] for the
-   `madeup-parallel` benchmark.
-
-[task/doxbee-sequential]: https://github.com/srikumarks/cspjs/blob/master/benchmark/doxbee-sequential.sjs
-[bluebird/doxbee-sequential]: https://github.com/petkaantonov/bluebird/blob/master/benchmark/doxbee-sequential/promises-bluebird-generator.js
-[task/doxbee-sequential-errors]: https://github.com/srikumarks/cspjs/blob/master/benchmark/doxbee-sequential-errors.sjs
-[bluebird/doxbee-sequential-errors]: https://github.com/petkaantonov/bluebird/blob/master/benchmark/doxbee-sequential-errors/promises-bluebird-generator.js
-[task/madeup-parallel]: https://github.com/srikumarks/cspjs/blob/master/benchmark/madeup-parallel.sjs
-[bluebird/madeup-parallel]: https://github.com/petkaantonov/bluebird/blob/master/benchmark/madeup-parallel/promises-bluebird-generator.js
-
-## So what's different from ES6 generators?
-
-There are a lot of similarities with generators, but some significant
-differences exist too.
-
-In two words, the difference is "error management". I think the traditional
-`try {} catch (e) {} finally {}` blocks promote sloppy thinking about error
-conditions. I want to place function-scoped `catch` and `finally` clauses up
-front or anywhere I want, near the code where I should be thinking about error
-conditions. Also "throw-ing" an error should not mean "dropping" it to
-catch/finally clauses below, should it? ;)
+Apart from tasks and channels, cspjs attempts at a saner and more expressive
+error handling mechanism than the traditional try-catch-finally model.  See
+[blog post][errman] describing the error error management scheme in detail.
 
 ## How do I use it?
 
-1. You need to have [sweetjs] installed with `npm install -g sweet.js`
+1. You need to have [sweetjs][] installed with `npm install -g sweet.js`
 2. You need to have the `state_machine.js` and `channel.js` modules in your npm
-   path .. somewhere is your project local `node_modules`.
+   path .. somewhere in your project local `node_modules`.
 3. To compile a `.sjs` file that uses the `task` macro, do -
 
         sjs --module ./path/to/src/task.js my-task-source.sjs > my-task-source.js
 
 For complete documentation, see the docco generated docs in `docs/*.html`.
-
-**Quick note**: I don't consider cspjs production ready yet .. at least not
-until I upload my suite of test cases for syntax transformation and the runtime
-modules.
 
 ## How does it perform?
 
@@ -155,4 +94,78 @@ callbacks-caolan-async-parallel.js      4214      216.52
 promises-obvious-kew.js                 5611      739.51
 promises-tildeio-rsvp.js                8857      872.50
 ```
+
+# History 
+
+**Note:** I'd placed this part at the top initially because I first wrote
+cspjs out of a desperate need to find a way to work with async code that was
+compatible with my brain. Now that cspjs has had some time in my projects, this
+can take a back seat. 
+
+My brain doesn't think well with promises. Despite that, [bluebird] is a
+fantastic implementation of the [Promises/A+] spec and then some, that many in
+the community are switching to promises wholesale.
+
+So what *does* my brain think well with? The kind of "communicating sequential
+processes" model used in [Haskell], [Erlang] and [Go] works very well with my
+brain. Also [clojure]'s [core.async] module uses this approach. Given this
+prominence of the CSP model, I'm quite sure there are many like me who want to
+use the CSP model with Javascript without having to switch to another language
+entirely.
+
+
+[Haskell]: http://www.haskell.org
+[Erlang]: http://erlang.org
+[Go]: http://golang.org
+[clojure]: http://clojure.org
+[core.async]: https://github.com/clojure/core.async
+[Promises/A+]: http://promises-aplus.github.io/promises-spec/
+[bluebird]: https://github.com/petkaantonov/bluebird
+[task]: https://github.com/srikumarks/cspjs/blob/master/src/task.js
+[Channel]: https://github.com/srikumarks/cspjs/blob/master/src/channel.js
+[errman]: http://sriku.org/blog/2014/02/11/bye-bye-js-promises/
+
+
+So, what did I do? I wrote a [sweetjs] macro named [task] and a support library
+for channels that provides this facility using as close to JS syntax as
+possible.  It compiles CSP-style code into a pure-JS (ES5) state machine. The
+code looks similar to generators and when generator support is ubiquitous the
+macro can easily be implemented to write code using them.  However, for the
+moment, generators are not ubiquitous on the browser side and it helps to have
+good async facilities there too. 
+
+No additional wrappers are needed to work with NodeJS-style callbacks since a
+"task" compiles down to a pure-JS function which takes a NodeJS-style callback
+as the final argument.
+
+[sweetjs]: http://sweetjs.org/
+
+## Show me the code already!
+
+1. Compare [task/doxbee-sequential] and [bluebird/doxbee-sequential] for the
+   `doxbee-sequential` benchmark. 
+2. Compare [task/doxbee-sequential-errors] and
+   [bluebird/doxbee-sequential-errors] for the `doxbee-sequential-errors`
+   benchmark.
+3. Compare [task/madeup-parallel] and [bluebird/madeup-parallel] for the
+   `madeup-parallel` benchmark.
+
+[task/doxbee-sequential]: https://github.com/srikumarks/cspjs/blob/master/benchmark/doxbee-sequential.sjs
+[bluebird/doxbee-sequential]: https://github.com/petkaantonov/bluebird/blob/master/benchmark/doxbee-sequential/promises-bluebird-generator.js
+[task/doxbee-sequential-errors]: https://github.com/srikumarks/cspjs/blob/master/benchmark/doxbee-sequential-errors.sjs
+[bluebird/doxbee-sequential-errors]: https://github.com/petkaantonov/bluebird/blob/master/benchmark/doxbee-sequential-errors/promises-bluebird-generator.js
+[task/madeup-parallel]: https://github.com/srikumarks/cspjs/blob/master/benchmark/madeup-parallel.sjs
+[bluebird/madeup-parallel]: https://github.com/petkaantonov/bluebird/blob/master/benchmark/madeup-parallel/promises-bluebird-generator.js
+
+## So what's different from ES6 generators?
+
+There are a lot of similarities with generators, but some significant
+differences exist too.
+
+In two words, the difference is "error management". I think the traditional
+`try {} catch (e) {} finally {}` blocks promote sloppy thinking about error
+conditions. I want to place function-scoped `catch` and `finally` clauses up
+front or anywhere I want, near the code where I should be thinking about error
+conditions. Also "throw-ing" an error should not mean "dropping" it to
+catch/finally clauses below, should it? ;)
 
