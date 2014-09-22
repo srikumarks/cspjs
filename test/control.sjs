@@ -308,6 +308,20 @@ describe('if_then_else', function () {
             }
             assert.equal(value, 42);
         });
+
+        it('must not modify the way return works', task {
+            var subtask = task {
+                var branched = false;
+                if (2 + 3 < 6) {
+                    branched = true;
+                    return branched;
+                }
+                console.log('You should not see this message!');
+                return false;
+            };
+            result <- subtask();
+            assert.equal(result, true);
+        });
     });
     describe('else', function () {
         it('must branch on the condition being truthy', task {
@@ -328,6 +342,21 @@ describe('if_then_else', function () {
                 branched = "else";
             }
             assert.equal(branched, "else");
+        });
+        it('must not modify the way return works', task {
+            var subtask = task {
+                var branched = false;
+                if (2 + 3 < 5) {
+                    console.log('dummy');
+                } else {
+                    branched = true;
+                    return branched;
+                }
+                console.log('You should not see this message!');
+                return false;
+            };
+            result <- subtask();
+            assert.equal(result, true);
         });
     });
 });
