@@ -156,7 +156,7 @@ macro task {
 
 macro setup_state_machine {
     rule { $task $callback $formals { $body ... } } => {
-        var StateMachine = arguments.callee.StateMachine || (arguments.callee.StateMachine = require('state_machine'));
+        var StateMachine = arguments.callee.StateMachine || (arguments.callee.StateMachine = require('cspjs/src/state_machine'));
         declare_state_arguments $formals ;
         var state_machine = new StateMachine(this, $callback, state_machine_fn, arguments.callee);
         declare_state_variables $task state_machine 0 ($callback) { $body ... } 

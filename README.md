@@ -12,11 +12,14 @@ error handling mechanism than the traditional try-catch-finally model.  See
 ## How do I use it?
 
 1. You need to have [sweetjs][] installed with `npm install -g sweet.js`
-2. You need to have the `state_machine.js` and `channel.js` modules in your npm
-   path .. somewhere in your project local `node_modules`.
+2. Install cspjs using npm like this - `npm install cspjs` to get it into your `node_modules` directory.
 3. To compile a `.sjs` file that uses the `task` macro, do -
 
-        sjs --module ./path/to/src/task.js my-task-source.sjs > my-task-source.js
+        sjs -m cspjs my-task-source.sjs > my-task-source.js
+        
+4. To use the `Channel` module, require it like this -
+
+        var Channel = require('cspjs/channel');
 
 For complete documentation, see the docco generated docs in `docs/*.html`.
 
