@@ -778,8 +778,7 @@ macro step_state_line {
         letstx $id2 = [makeValue(id + 1, #{$id})];
         return #{
             var tmp1 = $e;
-            tmp1 && $state_machine.callback(tmp1);
-            break;
+            if (tmp1) { $state_machine.callback(tmp1); break; }
             case $id2:
             step_state $task $state_machine $id2 { $rest ... }			
         };
