@@ -36,4 +36,18 @@ Channel.prototype.asReadableStream = function () {
     return readable;
 };
 
+// Simple piping function for continuously reading from
+// a readable stream.
+Channel.prototype.read = function (readable) {
+    readable.pipe(this.asWritableStream());
+    return this;
+};
+
+// Simple piping function for continuously writing to
+// a writable stream.
+Channel.prototype.write = function (writable) {
+    this.asReadableStream().pipe(writable);
+    return this;
+};
+
 module.exports = Channel;
