@@ -309,9 +309,13 @@ Channel.prototype.takeN = function (N, callback) {
         if (err) {
             return sendError(err, callback);
         }
-        group.push(value);
-        if (group.length < N) {
-            self.take(receive);
+        if (value !== null) {
+            group.push(value);
+            if (group.length < N) {
+                self.take(receive);
+            } else {
+                sendValue(group, callback);
+            }
         } else {
             sendValue(group, callback);
         }
