@@ -21,6 +21,10 @@ error handling mechanism than the traditional try-catch-finally model.  See
 
         var Channel = require('cspjs/channel');
 
+5. Or if you want to use channels with nodejs stream support, like this -
+
+        var Channel = require('cspjs/stream');
+
 For complete documentation, see the docco generated docs in `docs/*.html`.
 
 ## How does it perform?
