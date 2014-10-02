@@ -1,6 +1,6 @@
 # task - a sweetjs macro for CSP in Javascript
 
-The [task] macro, in conjunction with [Channel] objects lets you write CSP-ish
+The [task] macro, in conjunction with [Channel] objects lets you write [CSP]-ish
 code in Javascript that can interop with [Node.js]'s callback mechanism. This
 came out of a need for a better way to deal with async activities than offered
 by [Promises/A+][] or even generators.
@@ -8,6 +8,8 @@ by [Promises/A+][] or even generators.
 Apart from tasks and channels, cspjs attempts at a saner and more expressive
 error handling mechanism than the traditional try-catch-finally model.  See
 [blog post][errman] describing the error management scheme in detail.
+
+[CSP]: https://en.wikipedia.org/wiki/Communicating_sequential_processes
 
 ## How do I use it?
 
