@@ -279,7 +279,7 @@ StateMachine.prototype.jumpTable = function (id, cases, blockSizes) {
     return this.task_fn.cachedJumpTable[id] = new JumpTable(id, cases, blockSizes);
 };
 
-function DFVar() {
+function DataFlowVar() {
     StateMachine.Promise = StateMachine.Promise || require('bluebird');
     var self = this;
     self.promise = null;
@@ -294,15 +294,15 @@ function DFVar() {
 
 // Makes a new dataflow variable.
 StateMachine.prototype.dfvar = function () {
-    return new DFVar();
+    return new DataFlowVar();
 };
 
 StateMachine.prototype.dfbind = function (dfv, val, binder) {
     var sm = this;
-    if (dfv && dfv.constructor === DFVar) {
+    if (dfv && dfv.constructor === DataFlowVar) {
         if (val && val.then) {
             val.then(function (v) { dfv.resolve(v); }, function (err) { dfv.reject(err); });
-        } else if (val && val.constructor === DFVar) {
+        } else if (val && val.constructor === DataFlowVar) {
             val.promise.then(dfv.resolve, dfv.reject);
         } else {
             dfv.resolve(val);
@@ -313,15 +313,15 @@ StateMachine.prototype.dfbind = function (dfv, val, binder) {
     return val;
 };
 
-StateMachine.prototype.isDFVar = function (x) {
-    return x && (x.constructor === DFVar);
+StateMachine.prototype.isDataFlowVar = function (x) {
+    return x && (x.constructor === DataFlowVar);
 };
 
 StateMachine.prototype.ensure = function (id) {
     var sm = this, f = null;
     for (var i = 1; i < arguments.length; ++i) {
         var a = arguments[i];
-        if (a && a.constructor === DFVar) {
+        if (a && a.constructor === DataFlowVar) {
             f = sm.thenTo(id);
             a.promise.then(function (val) { f(null); }, function (err) { f(err); });
             return false;
