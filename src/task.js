@@ -15,6 +15,10 @@
 // The macro supports the following four forms to provide easy expression of
 // pure no-argument scripts and named tasks.
 
+// ## ensure_dfv
+//
+// Ensures that the data flow variables found in the given $x expression
+// are all bound before proceeding.
 macro ensure_dfv {
     case { $me $state_machine $id $dfvars { $x:expr } ; } => {
         function dfvars(stx, test) {
@@ -31,13 +35,9 @@ macro ensure_dfv {
                 }
                 return result;
             }
-            console.log("BEFORE");
-            var r = Object.keys(scan(stx)).map(function (v) { return test[v]; });
-            console.log("AFTER", JSON.stringify(result));
-            return r;
+            return Object.keys(scan(stx)).map(function (v) { return test[v]; });
         }
         function dftester(stx) {
-            console.log(require('util').inspect(stx, {depth: 10}))
             var result = {};
             stx[0].token.inner.forEach(function (v) {
                 result['%'+v.token.value] = v;
@@ -45,25 +45,17 @@ macro ensure_dfv {
             return result;
         }
         var dfvarnames = dftester(#{$dfvars});
-        console.log('dfvarnames', dfvarnames);
         if (dfvarnames) {
-            console.log("BEFORE2");
             var dfvs = dfvars(#{$x}, dfvarnames);
-            console.log("BEFORE3");
             if (dfvs.length > 0) {
                 letstx $pvars ... = dfvs ;
-                console.log("HERE");
                 return #{
                     if (!$state_machine.ensure($id, $pvars (,) ...)) { break; }
                 };
-            } else {
-                console.log('ensure_dfv - no dfvarnames after filtering!')
-                return #{};
             }
-        } else {
-            console.log('ensure_dfv - no dfvarnames!')
-            return #{};
         }
+            
+        return #{};
     }
 }
 
