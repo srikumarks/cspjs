@@ -15,72 +15,6 @@
 // The macro supports the following four forms to provide easy expression of
 // pure no-argument scripts and named tasks.
 
-// ## ensure_dfv
-//
-// Ensures that the data flow variables found in the given $x expression
-// are all bound before proceeding. 
-//
-// WARNING: The current algorithm is alpha quality only. It is overzealous
-// and will ensure that any symbol encountered in the expression whose form
-// matches a declared data flow variable will be ensured bound before proceeding.
-//
-// WORKAROUND: Do not use inline function expressions - i.e. function (x,y) { ... }.
-macro ensure_dfv {
-    case { $me $state_machine $id $dfvars { $x ... } ; } => {
-        function dfvars(stx, test) {
-            var result = {};
-            var enabled = [];
-            function scan(stx) {
-                if (stx && stx.token) {
-                    if (stx.token.value === '.') {
-                        // Disable identifier matching after periods in a sequence.
-                        enabled.pop();
-                        enabled.push(false);
-                        return result;
-                    }
-                    if (stx.token.type === 3 && test['%'+stx.token.value]) {
-                        if (enabled[enabled.length - 1]) {
-                            result['%'+stx.token.value] = true;
-                        } else {
-                            // Restore.
-                            enabled.pop();
-                            enabled.push(true);
-                        }
-                    } else if (stx.token.inner) {
-                        enabled.push(true);
-                        stx.token.inner.forEach(scan);
-                        enabled.pop();
-                    }
-                } else if (stx) {
-                    enabled.push(true);
-                    stx.forEach(scan);
-                    enabled.pop();
-                }
-                return result;
-            }
-            return Object.keys(scan(stx)).map(function (v) { return test[v]; });
-        }
-        function dftester(stx) {
-            var result = {};
-            stx[0].token.inner.forEach(function (v) {
-                result['%'+v.token.value] = v;
-            });
-            return result;
-        }
-        var dfvarnames = dftester(#{$dfvars});
-        if (dfvarnames) {
-            var dfvs = dfvars(#{$x ...}, dfvarnames);
-            if (dfvs.length > 0) {
-                letstx $pvars ... = dfvs ;
-                return #{
-                    if (!$state_machine.ensure($id, $pvars (,) ...)) { break; }
-                };
-            }
-        }
-            
-        return #{};
-    }
-}
 
 macro task {
    
@@ -731,6 +665,76 @@ macro step_state_line_catch {
 // For every statement that requires the values of variables known to be
 // data flow variables, we insert an "ensure" statement that makes sure that
 // the values are all available before proceeding.
+
+
+// ### ensure_dfv
+//
+// Ensures that the data flow variables found in the given $x expression
+// are all bound before proceeding. 
+//
+// WARNING: The current algorithm is alpha quality only. It is overzealous
+// and will ensure that any symbol encountered in the expression whose form
+// matches a declared data flow variable will be ensured bound before proceeding.
+//
+// WORKAROUND: Do not use inline function expressions - i.e. function (x,y) { ... }.
+// .. and if you do, make sure that the variable names in it don't clash with outside
+// names if that's not your intent.
+macro ensure_dfv {
+    case { $me $state_machine $id $dfvars { $x ... } ; } => {
+        function dfvars(stx, test) {
+            var result = {};
+            var enabled = [];
+            function scan(stx) {
+                if (stx && stx.token) {
+                    if (stx.token.value === '.') {
+                        // Disable identifier matching after periods in a sequence.
+                        enabled.pop();
+                        enabled.push(false);
+                        return result;
+                    }
+                    if (stx.token.type === 3 && test['%'+stx.token.value]) {
+                        if (enabled[enabled.length - 1]) {
+                            result['%'+stx.token.value] = true;
+                        } else {
+                            // Restore.
+                            enabled.pop();
+                            enabled.push(true);
+                        }
+                    } else if (stx.token.inner) {
+                        enabled.push(true);
+                        stx.token.inner.forEach(scan);
+                        enabled.pop();
+                    }
+                } else if (stx) {
+                    enabled.push(true);
+                    stx.forEach(scan);
+                    enabled.pop();
+                }
+                return result;
+            }
+            return Object.keys(scan(stx)).map(function (v) { return test[v]; });
+        }
+        function dftester(stx) {
+            var result = {};
+            stx[0].token.inner.forEach(function (v) {
+                result['%'+v.token.value] = v;
+            });
+            return result;
+        }
+        var dfvarnames = dftester(#{$dfvars});
+        if (dfvarnames) {
+            var dfvs = dfvars(#{$x ...}, dfvarnames);
+            if (dfvs.length > 0) {
+                letstx $pvars ... = dfvs ;
+                return #{
+                    if (!$state_machine.ensure($id, $pvars (,) ...)) { break; }
+                };
+            }
+        }
+            
+        return #{};
+    }
+}
 macro step_state_line_with_ensure_dfv {
     rule { $task $state_machine $id $dfvars { await $y ... (); } { $rest ... } } => {
         ensure_dfv $state_machine $id $dfvars { $y ... } ;
@@ -924,6 +928,12 @@ macro step_state_line {
         };
     }	
 
+    /// ### Data Flow Variable declaration
+    //
+    // While state variables must always be initialized, data flow variables may
+    // be uninitialized (i.e. "unresolved") at declaration. We interpret a var
+    // statement with uninitialized variables, therefore, as a dfvar declaration.
+    // Such dfvars must be bound using ":=".
     case { $me $task $state_machine $id $dfvars { var $x:ident (,) ... ; } { $rest ... } } => {
         var id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + 1, #{$id})];

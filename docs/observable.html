@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+  <title>observable.js</title>
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, target-densitydpi=160dpi, initial-scale=1.0; maximum-scale=1.0; user-scalable=0;">
+  <link rel="stylesheet" media="all" href="docco.css" />
+</head>
+<body>
+  <div id="container">
+    <div id="background"></div>
+    
+      <ul id="jump_to">
+        <li>
+          <a class="large" href="javascript:void(0);">Jump To &hellip;</a>
+          <a class="small" href="javascript:void(0);">+</a>
+          <div id="jump_wrapper">
+          <div id="jump_page">
+            
+              
+              <a class="source" href="channel.html">
+                channel.js
+              </a>
+            
+              
+              <a class="source" href="observable.html">
+                observable.js
+              </a>
+            
+              
+              <a class="source" href="state_machine.html">
+                state_machine.js
+              </a>
+            
+              
+              <a class="source" href="task.html">
+                task.js
+              </a>
+            
+          </div>
+        </li>
+      </ul>
+    
+    <ul class="sections">
+        
+          <li id="title">
+              <div class="annotation">
+                  <h1>observable.js</h1>
+              </div>
+          </li>
+        
+        
+        
+        <li id="section-1">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-1">&#182;</a>
+              </div>
+              
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">Observable</span><span class="hljs-params">()</span> {</span>
+    <span class="hljs-keyword">this</span>._isDone = <span class="hljs-literal">false</span>;
+    <span class="hljs-keyword">this</span>._stream = [];
+    <span class="hljs-keyword">this</span>._clients = [];
+    <span class="hljs-keyword">this</span>._clientTimes = [];
+}
+
+Observable.prototype._time = <span class="hljs-number">0</span>;
+
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">Event</span><span class="hljs-params">(value, t)</span> {</span>
+    <span class="hljs-keyword">this</span>.value = value;
+    <span class="hljs-keyword">this</span>.time = t;
+}
+
+Observable.prototype._newEvent = <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-params">(value)</span> {</span>
+    <span class="hljs-keyword">if</span> (!<span class="hljs-keyword">this</span>.isDone) {
+        <span class="hljs-keyword">this</span>.stream.push(<span class="hljs-keyword">new</span> Event(value, Observable.prototype._time));
+    }
+};
+
+Observable.prototype._processClients = <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-params">()</span> {</span>
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">var</span> cs = <span class="hljs-keyword">this</span>._clients, cN = cs.length, c = <span class="hljs-number">0</span>, t = <span class="hljs-keyword">this</span>._time; c &lt; cN; ++c) {
+        <span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>._clientTimes[c] &lt;= t) {
+            
+        }
+    }
+
+};
+
+Observable.prototype.done = <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-params">()</span> {</span>
+    <span class="hljs-keyword">this</span>.isDone = <span class="hljs-literal">true</span>;
+};
+
+
+
+Observable.prototype.listen = <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-params">(domElement, eventName)</span> {</span>
+    <span class="hljs-keyword">var</span> self = <span class="hljs-keyword">this</span>;
+    <span class="hljs-keyword">var</span> element = <span class="hljs-literal">null</span>;
+    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">typeof</span> domElement === <span class="hljs-string">'string'</span>) {
+        element = document.querySelector(domElement);
+    } <span class="hljs-keyword">else</span> {
+        element = domElement;
+    }
+
+    <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">listener</span><span class="hljs-params">(event)</span> {</span>
+        self.stream.push(event);
+        event.stopPropagation();
+    }
+
+    element.addEventListener(eventname, listener);
+};</pre></div></div>
+            
+        </li>
+        
+    </ul>
+  </div>
+</body>
+</html>

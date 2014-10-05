@@ -29,6 +29,11 @@
               </a>
             
               
+              <a class="source" href="stream.html">
+                stream.js
+              </a>
+            
+              
               <a class="source" href="task.html">
                 task.js
               </a>
@@ -568,9 +573,13 @@ the callback.</p>
         <span class="hljs-keyword">if</span> (err) {
             <span class="hljs-keyword">return</span> sendError(err, callback);
         }
-        group.push(value);
-        <span class="hljs-keyword">if</span> (group.length &lt; N) {
-            self.take(receive);
+        <span class="hljs-keyword">if</span> (value !== <span class="hljs-literal">null</span>) {
+            group.push(value);
+            <span class="hljs-keyword">if</span> (group.length &lt; N) {
+                self.take(receive);
+            } <span class="hljs-keyword">else</span> {
+                sendValue(group, callback);
+            }
         } <span class="hljs-keyword">else</span> {
             sendValue(group, callback);
         }
