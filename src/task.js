@@ -301,6 +301,11 @@ macro declare_state_variables_step {
 	rule { $task $state_machine $fin $vs ($u ...) { $bodypass ... } { var $x:ident (,) ... ; } { $rest ... } } => {
 		declare_state_variables $task $state_machine $fin $vs ($x ... $u ...) { $bodypass ... } { $rest ... }
 	}
+    // If a variable is being awaited on, we assume it could be a data flow variable.
+    // Saves an additional var statement to declare the variable as a data flow variable.
+	rule { $task $state_machine $fin $vs ($u ...) { $bodypass ... } { await $x:ident ... ; } { $rest ... } } => {
+		declare_state_variables $task $state_machine $fin $vs ($x ... $u ...) { $bodypass ... } { $rest ... }
+	}
 	rule { $task $state_machine $fin $vs $us { $bodypass ... } { $x ... ; } { $rest ... } } => {
 		declare_state_variables $task $state_machine $fin $vs $us { $bodypass ... } { $rest ... }
 	}
