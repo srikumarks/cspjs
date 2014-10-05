@@ -294,17 +294,27 @@ function DataFlowVar() {
 
 // Makes a new dataflow variable.
 StateMachine.prototype.dfvar = function (v, binder) {
+
+    // v could be task argument that is itself a valid
+    // data flow variable. In this case, we simply 
+    // use the same dfv.
     if (v && v.constructor === DataFlowVar) {
         v.promise.then(binder);
         return v;
     }
 
+    // For all other cases, we require a new dfv.
     var dfv = new DataFlowVar();
 
+    // v is allowed to be a promise-like object - i.e. a "thenable", 
+    // in which case we bind it to the dfv's resolver and rejecter.
     if (v && v.then) {
         v.then(dfv.resolve, dfv.reject);
     }
 
+    // The binder is the one that ensures that once the dfv
+    // is resolved, the variable ceases to be a dfv and becomes
+    // a regular value.
     dfv.promise.then(binder);
 
     return dfv;
@@ -314,10 +324,13 @@ StateMachine.prototype.dfbind = function (dfv, val) {
     var sm = this;
     if (dfv && dfv.constructor === DataFlowVar) {
         if (val && val.then) {
-            val.then(function (v) { dfv.resolve(v); }, function (err) { dfv.reject(err); });
-        } else if (val && val.constructor === DataFlowVar) {
+            // If val is a "thenable", then bind it to the dfv
+            val.then(dfv.resolve, dfv.reject);
+        } else if (val && val.constructor === DataFlowVar && val !== dfv) {
+            // If val is a dfv, then bind its outcome to this dfv's outcome.
             val.promise.then(dfv.resolve, dfv.reject);
         } else {
+            // For all normal values, resolve the dfv.
             dfv.resolve(val);
         }
         return dfv;
@@ -335,7 +348,9 @@ StateMachine.prototype.ensure = function (id) {
         var a = arguments[i];
         if (a && a.constructor === DataFlowVar) {
             f = sm.thenTo(id);
-            a.promise.then(function (val) { f(null); }, function (err) { f(err); });
+            // A regular nodejs callback (err, value) can be
+            // used as a rejector since the error is the first argument.
+            a.promise.then(function (val) { f(null); }, f);
             return false;
         }
     } 
