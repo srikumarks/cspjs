@@ -350,6 +350,10 @@ StateMachine.prototype.ensure = function (id) {
             f = sm.thenTo(id);
             // A regular nodejs callback (err, value) can be
             // used as a rejector since the error is the first argument.
+            // Note that we're waiting for these variables to resolve
+            // one by one. This allows for the possibility that
+            // multiple ones may resolve at a time, resulting 
+            // in fewer wait cycles.
             a.promise.then(function (val) { f(null); }, f);
             return false;
         }

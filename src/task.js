@@ -726,10 +726,12 @@ macro step_state_line_catch {
     }
 }
 
+// ## Data Flow Variable support
+//
+// For every statement that requires the values of variables known to be
+// data flow variables, we insert an "ensure" statement that makes sure that
+// the values are all available before proceeding.
 macro step_state_line_with_ensure_dfv {
-    // ### await
-    //
-    // The `await func(args...);` clause is a synonym for `<- func(args...);`.
     rule { $task $state_machine $id $dfvars { await $y ... (); } { $rest ... } } => {
         ensure_dfv $state_machine $id $dfvars { $y ... } ;
         step_state_line $task $state_machine $id $dfvars { await $y ... (); } { $rest ... }
@@ -741,28 +743,11 @@ macro step_state_line_with_ensure_dfv {
         step_state_line $task $state_machine $id $dfvars { await $y ... ($args (,) ...); } { $rest ... }
     }
 
-    // ### Taking values from channels
-    //
-    // If you have functions that return channels on which they will produce their results,
-    // then you can use this expression as syntax sugar to get the value out of the returned
-    // channel.
-    //
-    //      val <- chan someProcess(arg1, arg1);
-
     rule { $task $state_machine $id $dfvars { $x:ident (,) ... <- chan $y ... ; } { $rest ... } } => {
         ensure_dfv $state_machine $id $dfvars { $y ... } ;
         step_state_line $task $state_machine $id $dfvars { $x (,) ... <- chan $y ... ; } { $rest ... }
     }
 
-    // ### Retrieving values
-    //
-    // Values are retrieved from async steps using the `<-` clause of the form -
-    //
-    //      x, y, z <- coll[42].thing.asyncMethod(arg1, arg2);
-    //
-    // This block and the following are basically the same. The problem is that I don't know
-    // how to insert the additional callback argument with a preceding comma in one
-    // case and without one in the other.
     rule { $task $state_machine $id $dfvars { $x:ident (,) ... <- $y ... (); } { $rest ... } } => {
         ensure_dfv $state_machine $id $dfvars { $y ... } ;
         step_state_line $task $state_machine $id $dfvars { $x (,) ... <- $y ... (); } { $rest ... }
@@ -779,11 +764,6 @@ macro step_state_line_with_ensure_dfv {
         step_state_line $task $state_machine $id $dfvars { $x := $y; } { $rest ... }
     }
 
-    // ### State variable declaration
-    //
-    // State variables are shared with expressions in the entire task and can be
-    // declared anywhere using var statements. Initializers are compulsory.
-
     rule { $task $state_machine $id $dfvars { var $($x:ident = $y:expr) (,) ... ; } { $rest ... } } => {
         ensure_dfv $state_machine $id $dfvars { ($y (,) ...) };
         step_state_line $task $state_machine $id $dfvars { var $($x = $y) (,) ... ; } { $rest ... }
@@ -793,47 +773,15 @@ macro step_state_line_with_ensure_dfv {
         step_state $task $state_machine $id $dfvars { $rest ... }
     }	
 
-    // ### Returning values from a task
-    //
-    // `return x, y, ...;` will result in the task winding back up any
-    // `finally` actions and then providing the given values to the next task
-    // by calling the last callback argument to the task. Such a statement
-    // will, obviously, return from within any block within control structures.
-    //
-    // Though you can return from anywhere in this implementation, don't return
-    // from within finally clauses.
-
     rule { $task $state_machine $id $dfvars { return $x:expr (,) ... ; } { $rest ... } } => {
         ensure_dfv $state_machine $id $dfvars { ($x (,) ...) } ;
         step_state_line $task $state_machine $id $dfvars { return $x (,) ... ; } { $rest ... }
     }
 
-    // ### Raising errors
-    //
-    // The usual `throw err;` form will cause the error to first bubble up
-    // the `finally` actions and the installed `catch` sequence and if the
-    // error survives them all, will be passed on to the task's callback.
-    //
-    // Hack: "throw object.err;" can be used as a short hand for
-    // "if (object.err) { throw object.err; }". i.e. the error is thrown
-    // only if it is not null or undefined or false. This fits with Node.js's
-    // callback convention where `err === null` tests whether there is an
-    // error or not. So throwing a `null` doesn't make sense.
-
     rule { $task $state_machine $id $dfvars { throw $e:expr ; } { $rest ... } } => {
         ensure_dfv $state_machine $id $dfvars { $e } ;
         step_state_line $task $state_machine $id $dfvars { throw $e ; } { $rest ... }
     }
-
-    // ### Retrying a failed operation.
-    //
-    // Within a catch block, you can use the retry statement 
-    //
-    //      retry;
-    // 
-    // to jump control again to the beginning of the code that
-    // the catch block traps errors for ... which is immediately
-    // after the ending brace of the catch block.
 
     rule { $task $state_machine $id $dfvars { retry ; } { $rest ... } } => {
         step_state_line $task $state_machine $id $dfvars { retry ; } { $rest ... }
@@ -944,6 +892,12 @@ macro step_state_line {
         };
     }
 
+    // ### Data flow binding
+    //
+    // Statements of the form "X := y;", where "X" is an identifier and "y" is an expression,
+    // cause "X" to be interpreted as a "data flow variable" - i.e. a "promise" - that will
+    // be resolved to the value computed by the "y" expression.
+ 
     case { $me $task $state_machine $id $dfvars { $x:ident := $y:expr; } { $rest ... } } => {
         var id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + 1, #{$id})];
