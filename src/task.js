@@ -23,19 +23,38 @@
 // WARNING: The current algorithm is alpha quality only. It is overzealous
 // and will ensure that any symbol encountered in the expression whose form
 // matches a declared data flow variable will be ensured bound before proceeding.
+//
+// WORKAROUND: Do not use inline function expressions - i.e. function (x,y) { ... }.
 macro ensure_dfv {
     case { $me $state_machine $id $dfvars { $x ... } ; } => {
         function dfvars(stx, test) {
             var result = {};
+            var enabled = [];
             function scan(stx) {
                 if (stx && stx.token) {
+                    if (stx.token.value === '.') {
+                        // Disable identifier matching after periods in a sequence.
+                        enabled.pop();
+                        enabled.push(false);
+                        return result;
+                    }
                     if (stx.token.type === 3 && test['%'+stx.token.value]) {
-                        result['%'+stx.token.value] = true;
+                        if (enabled[enabled.length - 1]) {
+                            result['%'+stx.token.value] = true;
+                        } else {
+                            // Restore.
+                            enabled.pop();
+                            enabled.push(true);
+                        }
                     } else if (stx.token.inner) {
+                        enabled.push(true);
                         stx.token.inner.forEach(scan);
+                        enabled.pop();
                     }
                 } else if (stx) {
+                    enabled.push(true);
                     stx.forEach(scan);
+                    enabled.pop();
                 }
                 return result;
             }

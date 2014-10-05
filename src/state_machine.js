@@ -303,7 +303,7 @@ StateMachine.prototype.dfbind = function (dfv, val, binder) {
         if (val && val.then) {
             val.then(function (v) { dfv.resolve(v); }, function (err) { dfv.reject(err); });
         } else if (val && val.constructor === DFVar) {
-            val.promise.then(function (v) { dfv.resolve(v); }, function (e) { dfv.reject(e); });
+            val.promise.then(dfv.resolve, dfv.reject);
         } else {
             dfv.resolve(val);
         }
