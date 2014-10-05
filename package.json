@@ -1,25 +1,26 @@
 {
-    "name": "cspjs",
-    "description": "A macro for easing programming with async Javascript APIs",
-    "author": "Srikumar",
-    "version": "0.4.9",
-    "main" : "src/task.js",
-    "dependencies": {
-        "sweet.js" : ">= 0.4.1"
-    },
-    "devDependencies": {
-        "mocha": "~1.3.2"
-    },
-    "repository": {
-        "type": "git",
-        "url": "git://github.com/srikumarks/cspjs.git"
-    },
-    "keywords": [
-        "sweet-macros",
-        "macros",
-        "javascript",
-        "csp",
-        "asynchronous"
-    ],
-    "license": "MIT"
+  "name": "cspjs",
+  "description": "A macro for easing programming with async Javascript APIs",
+  "author": "Srikumar",
+  "version": "0.4.9",
+  "main": "src/task.js",
+  "dependencies": {
+    "bluebird": "^2.3.4",
+    "sweet.js": ">= 0.4.1"
+  },
+  "devDependencies": {
+    "mocha": "~1.3.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/srikumarks/cspjs.git"
+  },
+  "keywords": [
+    "sweet-macros",
+    "macros",
+    "javascript",
+    "csp",
+    "asynchronous"
+  ],
+  "license": "MIT"
 }
