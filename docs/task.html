@@ -980,45 +980,17 @@ names if that’s not your intent.</p>
             <span class="hljs-keyword">var</span> enabled = [];
             <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">scan</span><span class="hljs-params">(stx)</span> {</span>
                 <span class="hljs-keyword">if</span> (stx &amp;&amp; stx.token) {
-                    <span class="hljs-keyword">if</span> (stx.token.value === <span class="hljs-string">'.'</span>) {</pre></div></div>
-            
-        </li>
-        
-        
-        <li id="section-24">
-            <div class="annotation">
-              
-              <div class="pilwrap ">
-                <a class="pilcrow" href="#section-24">&#182;</a>
-              </div>
-              <p>Disable identifier matching after periods in a sequence.</p>
-
-            </div>
-            
-            <div class="content"><div class='highlight'><pre>                        enabled.pop();
-                        enabled.push(<span class="hljs-literal">false</span>);
+                    <span class="hljs-keyword">if</span> (stx.token.value === <span class="hljs-string">'.'</span>) {
+                        <span class="hljs-comment">/* Disable identifier matching after periods in a sequence. */</span>
+                        enabled[enabled.length - <span class="hljs-number">1</span>] = <span class="hljs-literal">false</span>;
                         <span class="hljs-keyword">return</span> result;
                     }
                     <span class="hljs-keyword">if</span> (stx.token.type === <span class="hljs-number">3</span> &amp;&amp; test[<span class="hljs-string">'%'</span>+stx.token.value]) {
                         <span class="hljs-keyword">if</span> (enabled[enabled.length - <span class="hljs-number">1</span>]) {
                             result[<span class="hljs-string">'%'</span>+stx.token.value] = <span class="hljs-literal">true</span>;
-                        } <span class="hljs-keyword">else</span> {</pre></div></div>
-            
-        </li>
-        
-        
-        <li id="section-25">
-            <div class="annotation">
-              
-              <div class="pilwrap ">
-                <a class="pilcrow" href="#section-25">&#182;</a>
-              </div>
-              <p>Restore.</p>
-
-            </div>
-            
-            <div class="content"><div class='highlight'><pre>                            enabled.pop();
-                            enabled.push(<span class="hljs-literal">true</span>);
+                        } <span class="hljs-keyword">else</span> {
+                            <span class="hljs-comment">/* Restore. */</span>
+                            enabled[enabled.length - <span class="hljs-number">1</span>] = <span class="hljs-literal">true</span>;
                         }
                     } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (stx.token.inner) {
                         enabled.push(<span class="hljs-literal">true</span>);
@@ -1042,16 +1014,14 @@ names if that’s not your intent.</p>
             <span class="hljs-keyword">return</span> result;
         }
         <span class="hljs-keyword">var</span> dfvarnames = dftester(#{$dfvars});
-        <span class="hljs-keyword">if</span> (dfvarnames) {
-            <span class="hljs-keyword">var</span> dfvs = dfvars(#{$x ...}, dfvarnames);
-            <span class="hljs-keyword">if</span> (dfvs.length &gt; <span class="hljs-number">0</span>) {
-                letstx $pvars ... = dfvs ;
-                <span class="hljs-keyword">return</span> #{
-                    <span class="hljs-keyword">if</span> (!$state_machine.ensure($id, $pvars (,) ...)) { <span class="hljs-keyword">break</span>; }
-                };
-            }
+        <span class="hljs-keyword">var</span> dfvs = dfvars(#{$x ...}, dfvarnames);
+        <span class="hljs-keyword">if</span> (dfvs.length &gt; <span class="hljs-number">0</span>) {
+            letstx $pvars ... = dfvs ;
+            <span class="hljs-keyword">return</span> #{
+                <span class="hljs-keyword">if</span> (!$state_machine.ensure($id, $pvars (,) ...)) { <span class="hljs-keyword">break</span>; }
+            };
         }
-            
+
         <span class="hljs-keyword">return</span> #{};
     }
 }
@@ -1119,11 +1089,11 @@ macro step_state_line_with_ensure_dfv {
         </li>
         
         
-        <li id="section-26">
+        <li id="section-24">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-26">&#182;</a>
+                <a class="pilcrow" href="#section-24">&#182;</a>
               </div>
               <h2 id="step_state_line">step_state_line</h2>
 <p>This is the real work horse which walks through each statement and compiles
@@ -1137,11 +1107,11 @@ macro step_state_line {</pre></div></div>
         </li>
         
         
-        <li id="section-27">
+        <li id="section-25">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-27">&#182;</a>
+                <a class="pilcrow" href="#section-25">&#182;</a>
               </div>
               <h3 id="await">await</h3>
 <p>The <code>await func(args...);</code> clause is a synonym for <code>&lt;- func(args...);</code>.</p>
@@ -1173,11 +1143,11 @@ macro step_state_line {</pre></div></div>
         </li>
         
         
-        <li id="section-28">
+        <li id="section-26">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-28">&#182;</a>
+                <a class="pilcrow" href="#section-26">&#182;</a>
               </div>
               <h3 id="taking-values-from-channels">Taking values from channels</h3>
 <p>If you have functions that return channels on which they will produce their results,
@@ -1195,11 +1165,11 @@ channel.</p>
         </li>
         
         
-        <li id="section-29">
+        <li id="section-27">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-29">&#182;</a>
+                <a class="pilcrow" href="#section-27">&#182;</a>
               </div>
               <p>In this form (ex: z &lt;- chan blah[32].bling(); ), the expression is expected to
 produce a channel, from which a value will be taken. </p>
@@ -1227,11 +1197,11 @@ has the same <code>take</code> protocol as a channel can be used.</p>
         </li>
         
         
-        <li id="section-30">
+        <li id="section-28">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-30">&#182;</a>
+                <a class="pilcrow" href="#section-28">&#182;</a>
               </div>
               <h3 id="retrieving-values">Retrieving values</h3>
 <p>Values are retrieved from async steps using the <code>&lt;-</code> clause of the form -</p>
@@ -1273,11 +1243,11 @@ case and without one in the other.</p>
         </li>
         
         
-        <li id="section-31">
+        <li id="section-29">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-31">&#182;</a>
+                <a class="pilcrow" href="#section-29">&#182;</a>
               </div>
               <h3 id="data-flow-binding">Data flow binding</h3>
 <p>Statements of the form “X := y;”, where “X” is an identifier and “y” is an expression,
@@ -1301,11 +1271,11 @@ be resolved to the value computed by the “y” expression.</p>
         </li>
         
         
-        <li id="section-32">
+        <li id="section-30">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-32">&#182;</a>
+                <a class="pilcrow" href="#section-30">&#182;</a>
               </div>
               <h3 id="state-variable-declaration">State variable declaration</h3>
 <p>State variables are shared with expressions in the entire task and can be
@@ -1327,11 +1297,11 @@ declared anywhere using var statements. Initializers are compulsory.</p>
         </li>
         
         
-        <li id="section-33">
+        <li id="section-31">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-33">&#182;</a>
+                <a class="pilcrow" href="#section-31">&#182;</a>
               </div>
               <p>/ ### Data Flow Variable declaration</p>
 <p>While state variables must always be initialized, data flow variables may
@@ -1348,11 +1318,11 @@ Such dfvars must be bound using “:=”.</p>
         </li>
         
         
-        <li id="section-34">
+        <li id="section-32">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-34">&#182;</a>
+                <a class="pilcrow" href="#section-32">&#182;</a>
               </div>
               <p>Step the state number by 1 so we don’t have to special case the state counter.</p>
 
@@ -1367,11 +1337,11 @@ Such dfvars must be bound using “:=”.</p>
         </li>
         
         
-        <li id="section-35">
+        <li id="section-33">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-35">&#182;</a>
+                <a class="pilcrow" href="#section-33">&#182;</a>
               </div>
               <h3 id="returning-values-from-a-task">Returning values from a task</h3>
 <p><code>return x, y, ...;</code> will result in the task winding back up any
@@ -1398,11 +1368,11 @@ from within finally clauses.</p>
         </li>
         
         
-        <li id="section-36">
+        <li id="section-34">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-36">&#182;</a>
+                <a class="pilcrow" href="#section-34">&#182;</a>
               </div>
               <h3 id="raising-errors">Raising errors</h3>
 <p>The usual <code>throw err;</code> form will cause the error to first bubble up
@@ -1431,11 +1401,11 @@ error or not. So throwing a <code>null</code> doesn’t make sense.</p>
         </li>
         
         
-        <li id="section-37">
+        <li id="section-35">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-37">&#182;</a>
+                <a class="pilcrow" href="#section-35">&#182;</a>
               </div>
               <h3 id="retrying-a-failed-operation-">Retrying a failed operation.</h3>
 <p>Within a catch block, you can use the retry statement </p>
@@ -1461,11 +1431,11 @@ after the ending brace of the catch block.</p>
         </li>
         
         
-        <li id="section-38">
+        <li id="section-36">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-38">&#182;</a>
+                <a class="pilcrow" href="#section-36">&#182;</a>
               </div>
               <h2 id="internals">Internals</h2>
 <h3 id="-phi-"><code>phi</code></h3>
@@ -1488,11 +1458,11 @@ after the ending brace of the catch block.</p>
         </li>
         
         
-        <li id="section-39">
+        <li id="section-37">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-39">&#182;</a>
+                <a class="pilcrow" href="#section-37">&#182;</a>
               </div>
               <h3 id="synchronous-statements">Synchronous statements</h3>
 <p>Any statement that doesn’t match the above structures are considered

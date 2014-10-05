@@ -687,18 +687,16 @@ macro ensure_dfv {
             function scan(stx) {
                 if (stx && stx.token) {
                     if (stx.token.value === '.') {
-                        // Disable identifier matching after periods in a sequence.
-                        enabled.pop();
-                        enabled.push(false);
+                        /* Disable identifier matching after periods in a sequence. */
+                        enabled[enabled.length - 1] = false;
                         return result;
                     }
                     if (stx.token.type === 3 && test['%'+stx.token.value]) {
                         if (enabled[enabled.length - 1]) {
                             result['%'+stx.token.value] = true;
                         } else {
-                            // Restore.
-                            enabled.pop();
-                            enabled.push(true);
+                            /* Restore. */
+                            enabled[enabled.length - 1] = true;
                         }
                     } else if (stx.token.inner) {
                         enabled.push(true);
@@ -722,16 +720,14 @@ macro ensure_dfv {
             return result;
         }
         var dfvarnames = dftester(#{$dfvars});
-        if (dfvarnames) {
-            var dfvs = dfvars(#{$x ...}, dfvarnames);
-            if (dfvs.length > 0) {
-                letstx $pvars ... = dfvs ;
-                return #{
-                    if (!$state_machine.ensure($id, $pvars (,) ...)) { break; }
-                };
-            }
+        var dfvs = dfvars(#{$x ...}, dfvarnames);
+        if (dfvs.length > 0) {
+            letstx $pvars ... = dfvs ;
+            return #{
+                if (!$state_machine.ensure($id, $pvars (,) ...)) { break; }
+            };
         }
-            
+
         return #{};
     }
 }
