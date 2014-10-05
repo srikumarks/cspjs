@@ -924,7 +924,7 @@ macro step_state_line {
         };
     }	
 
-    /// ### Data Flow Variable declaration
+    // ### Data Flow Variable declaration
     //
     // While state variables must always be initialized, data flow variables may
     // be uninitialized (i.e. "unresolved") at declaration. We interpret a var
