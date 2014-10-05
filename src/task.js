@@ -841,8 +841,22 @@ macro step_state_line_with_ensure_dfv {
         step_state_line $task $state_machine $id $dfvars { $x = $y ... ; } { $rest ... }
     }
 
-    rule { $task $state_machine $id $dfvars { $x ... ; } { $rest ... } } => {
+    // Normal statements aren't scanned for data flow variables. You can ensure some
+    // data flow variables are bound by using an "await" statement like this -
+    //
+    //      await x y z;
+    //      doSomething(x,y,z);
+    //
+    // The reason normal statements aren't scanned is that you may want to pass a
+    // data flow variable to another function or spawn a task, where the function
+    // or task performs the binding. If an ensure_dfv precedes such statements, the
+    // main task will block forever.
+    rule { $task $state_machine $id $dfvars { await $x:ident ... ; } { $rest ... } } => {
         ensure_dfv $state_machine $id $dfvars { $x ... } ;
+        step_state $task $state_machine $id $dfvars { $rest ... }
+    }
+    
+    rule { $task $state_machine $id $dfvars { $x ... ; } { $rest ... } } => {
         step_state_line $task $state_machine $id $dfvars { $x ... ; } { $rest ... }
     }
 }
