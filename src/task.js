@@ -195,43 +195,43 @@ macro setup_state_machine {
 // to the `declare_state_variables` macro is expected to match this.
 
 macro declare_state_variables {
-    rule { $task $state_machine $fin $vars $dfvars { $body ... } { if ($x ...) { $then ... } else { $else ... } $rest ... } } => {
-        declare_state_variables $task $state_machine $fin $vars $dfvars { $body ... } { $then ... $else ... $rest ... }
+    rule { $task $state_machine $fin $vars $dfvars { $bodypass ... } { if ($x ...) { $then ... } else { $else ... } $rest ... } } => {
+        declare_state_variables $task $state_machine $fin $vars $dfvars { $bodypass ... } { $then ... $else ... $rest ... }
     }
-    rule { $task $state_machine $fin $vars $dfvars { $body ... } { if ($x ...) { $then ... }  $rest ... } } => {
-        declare_state_variables $task $state_machine $fin $vars $dfvars { $body ... } { $then ... $rest ... }
+    rule { $task $state_machine $fin $vars $dfvars { $bodypass ... } { if ($x ...) { $then ... }  $rest ... } } => {
+        declare_state_variables $task $state_machine $fin $vars $dfvars { $bodypass ... } { $then ... $rest ... }
     }
     // Rewrite for loops using while.
-    rule { $task $state_machine $fin $vars $dfvars { $body ... } { for ($init ... ; $cond ... ; $next ...) { $body ... }  $rest ... } } => {
-        declare_state_variables $task $state_machine $fin $vars $dfvars { $body ... } { $init ... ; while ($cond ...) { $body ... $next ... ; } $rest ... }
+    rule { $task $state_machine $fin $vars $dfvars { $bodypass ... } { for ($init ... ; $cond ... ; $next ...) { $body ... }  $rest ... } } => {
+        declare_state_variables $task $state_machine $fin $vars $dfvars { $bodypass ... } { $init ... ; while ($cond ...) { $body ... $next ... ; } $rest ... }
     }
-    rule { $task $state_machine $fin $vars $dfvars { $body ... } { while ($x ...) { $body ... }  $rest ... } } => {
-        declare_state_variables $task $state_machine $fin $vars $dfvars { $body ... } { $body ... $rest ... }
+    rule { $task $state_machine $fin $vars $dfvars { $bodypass ... } { while ($x ...) { $body ... }  $rest ... } } => {
+        declare_state_variables $task $state_machine $fin $vars $dfvars { $bodypass ... } { $body ... $rest ... }
     }
     // If a finally block is encountered somewhere in the body, then we
     // need to be able to save and restore state variables. So keep track of that.
-    rule { $task $state_machine $fin $vars $dfvars { $body ... } { finally { $cleanup ... } $rest ... } } => {
-        declare_state_variables $task $state_machine 1 $vars $dfvars { $body ... } { $cleanup ... $rest ... }
+    rule { $task $state_machine $fin $vars $dfvars { $bodypass ... } { finally { $cleanup ... } $rest ... } } => {
+        declare_state_variables $task $state_machine 1 $vars $dfvars { $bodypass ... } { $cleanup ... $rest ... }
     }
-    rule { $task $state_machine $fin $vars $dfvars { $body ... } { finally $cleanup ... ($args:expr (,) ...) ; $rest ... } } => {
-        declare_state_variables $task $state_machine $fin $vars $dfvars { $body ... } { $rest ... }
+    rule { $task $state_machine $fin $vars $dfvars { $bodypass ... } { finally $cleanup ... ($args:expr (,) ...) ; $rest ... } } => {
+        declare_state_variables $task $state_machine $fin $vars $dfvars { $bodypass ... } { $rest ... }
     }
-    rule { $task $state_machine $fin $vars $dfvars { $body ... } { catch ($eclass:ident $e:ident) { $handler ... } $rest ... } } => {
-        declare_state_variables $task $state_machine $fin $vars $dfvars { $body ... } { var $e = null ; $handler ... $rest ... }
+    rule { $task $state_machine $fin $vars $dfvars { $bodypass ... } { catch ($eclass:ident $e:ident) { $handler ... } $rest ... } } => {
+        declare_state_variables $task $state_machine $fin $vars $dfvars { $bodypass ... } { var $e = null ; $handler ... $rest ... }
     }
-    rule { $task $state_machine $fin $vars $dfvars { $body ... } { catch ($e:ident) { $handler ... } $rest ... } } => {
-        declare_state_variables $task $state_machine $fin $vars $dfvars { $body ... } { var $e = null ; $handler ... $rest ... }
+    rule { $task $state_machine $fin $vars $dfvars { $bodypass ... } { catch ($e:ident) { $handler ... } $rest ... } } => {
+        declare_state_variables $task $state_machine $fin $vars $dfvars { $bodypass ... } { var $e = null ; $handler ... $rest ... }
     }
     rule { $task $state_machine $fin $vars $dfvars { $bodypass ... } { switch ($x ...) { $(case $ix:lit (,) ... : { $body ... }) ... } $rest ... } } => {
         declare_state_variables $task $state_machine $fin $vars $dfvars { $bodypass ... } { $($body ...) ... $rest ... }
     }
-    rule { $task $state_machine $fin $vars $dfvars { $body ... } { $step ... ; $rest ... } } => {
-        declare_state_variables_step $task $state_machine $fin $vars $dfvars { $body ... } { $step ... ; } { $rest ... }
+    rule { $task $state_machine $fin $vars $dfvars { $bodypass ... } { $step ... ; $rest ... } } => {
+        declare_state_variables_step $task $state_machine $fin $vars $dfvars { $bodypass ... } { $step ... ; } { $rest ... }
     }
-    rule { $task $state_machine $fin $vars $dfvars { $body ... } { } } => { 
-        declare_unique_varset $task $state_machine $fin $vars $dfvars { $body ... } 
+    rule { $task $state_machine $fin $vars $dfvars { $bodypass ... } { } } => { 
+        declare_unique_varset $task $state_machine $fin $vars $dfvars { $bodypass ... } 
     }
-    rule { $task $state_machine $fin () () { $body ... } { } } => { 
+    rule { $task $state_machine $fin () () { $bodypass ... } { } } => { 
     }
 }
 
@@ -286,23 +286,23 @@ macro declare_pvarset {
 }
 
 macro declare_state_variables_step {
-	rule { $task $state_machine $fin ($v ...) ($u ...) { $body ... } { $x:ident <- $y ... ; } { $rest ... } } => {
-		declare_state_variables $task $state_machine $fin ($x $v ...) ($u ...) { $body ... } { $rest ... }
+	rule { $task $state_machine $fin ($v ...) ($u ...) { $bodypass ... } { $x:ident <- $y ... ; } { $rest ... } } => {
+		declare_state_variables $task $state_machine $fin ($x $v ...) ($u ...) { $bodypass ... } { $rest ... }
 	}
-	rule { $task $state_machine $fin ($v ...) $us { $body ... } { $x:ident (,) ... <- $y ... ; } { $rest ... } } => {
-		declare_state_variables $task $state_machine $fin ($x ... $v ...) $us { $body ... } { $rest ... }
+	rule { $task $state_machine $fin ($v ...) $us { $bodypass ... } { $x:ident (,) ... <- $y ... ; } { $rest ... } } => {
+		declare_state_variables $task $state_machine $fin ($x ... $v ...) $us { $bodypass ... } { $rest ... }
 	}
-	rule { $task $state_machine $fin $vs ($u ...) { $body ... } { $x:ident := $y ... ; } { $rest ... } } => {
-		declare_state_variables $task $state_machine $fin $vs ($x $u ...) { $body ... } { $rest ... }
+	rule { $task $state_machine $fin $vs ($u ...) { $bodypass ... } { $x:ident := $y ... ; } { $rest ... } } => {
+		declare_state_variables $task $state_machine $fin $vs ($x $u ...) { $bodypass ... } { $rest ... }
 	}
-	rule { $task $state_machine $fin ($v ...) $us { $body ... } { var $($x:ident = $y:expr) (,) ... ; } { $rest ... } } => {
-		declare_state_variables $task $state_machine $fin ($x ... $v ...) $us { $body ... } { $rest ... }
+	rule { $task $state_machine $fin ($v ...) $us { $bodypass ... } { var $($x:ident = $y:expr) (,) ... ; } { $rest ... } } => {
+		declare_state_variables $task $state_machine $fin ($x ... $v ...) $us { $bodypass ... } { $rest ... }
 	}
-	rule { $task $state_machine $fin $vs ($u ...) { $body ... } { var $x:ident (,) ... ; } { $rest ... } } => {
-		declare_state_variables $task $state_machine $fin $vs ($x ... $u ...) { $body ... } { $rest ... }
+	rule { $task $state_machine $fin $vs ($u ...) { $bodypass ... } { var $x:ident (,) ... ; } { $rest ... } } => {
+		declare_state_variables $task $state_machine $fin $vs ($x ... $u ...) { $bodypass ... } { $rest ... }
 	}
-	rule { $task $state_machine $fin $vs $us { $body ... } { $x ... ; } { $rest ... } } => {
-		declare_state_variables $task $state_machine $fin $vs $us { $body ... } { $rest ... }
+	rule { $task $state_machine $fin $vs $us { $bodypass ... } { $x ... ; } { $rest ... } } => {
+		declare_state_variables $task $state_machine $fin $vs $us { $bodypass ... } { $rest ... }
 	}
 }
 
@@ -455,9 +455,9 @@ macro step_state_line_if_else {
 }
 
 macro step_state_line_if_else_with_ensure_dfv {
-    rule { $task $state_machine $id $dfvars { if ($x ...) { $then ... } else { $else ... } } { $rest ... } } => {
-        ensure_dfv $state_machine $id $dfvars { $x ... } ;
-        step_state_line_if_else $task $state_machine $id $dfvars { if ($x ...) { $then ... } else { $else ... } } { $rest ... }
+    rule { $task $state_machine $id $dfvars { if ($x:expr) { $then ... } else { $else ... } } { $rest ... } } => {
+        ensure_dfv $state_machine $id $dfvars { $x } ;
+        step_state_line_if_else $task $state_machine $id $dfvars { if ($x) { $then ... } else { $else ... } } { $rest ... }
     }
 }
 
@@ -565,7 +565,7 @@ macro step_state_line_while {
                 break;
             }
             case $id2:
-            step_state $task $state_machine $id2 { $body ... phi $state_machine ; $rest ... }
+            step_state $task $state_machine $id2 $dfvars { $body ... phi $state_machine ; $rest ... }
         };
     }                                                    
 }
@@ -808,11 +808,6 @@ macro step_state_line_with_ensure_dfv {
         step_state_line $task $state_machine $id $dfvars { $x (,) ... <- $y ... ($args (,) ...); } { $rest ... }
     }
 
-    rule { $task $state_machine $id $dfvars { $x:ident := $y:expr; } { $rest ... } } => {
-        ensure_dfv $state_machine $id $dfvars { $y } ;
-        step_state_line $task $state_machine $id $dfvars { $x := $y; } { $rest ... }
-    }
-
     rule { $task $state_machine $id $dfvars { var $($x:ident = $y:expr) (,) ... ; } { $rest ... } } => {
         ensure_dfv $state_machine $id $dfvars { ($y (,) ...) };
         step_state_line $task $state_machine $id $dfvars { var $($x = $y) (,) ... ; } { $rest ... }
@@ -821,6 +816,11 @@ macro step_state_line_with_ensure_dfv {
     rule { $task $state_machine $id $dfvars { var $x:ident (,) ... ; } { $rest ... } } => {
         step_state $task $state_machine $id $dfvars { $rest ... }
     }	
+
+    rule { $task $state_machine $id $dfvars { $x:ident := $y:expr; } { $rest ... } } => {
+        ensure_dfv $state_machine $id $dfvars { $y } ;
+        step_state_line $task $state_machine $id $dfvars { $x := $y; } { $rest ... }
+    }
 
     rule { $task $state_machine $id $dfvars { return $x:expr (,) ... ; } { $rest ... } } => {
         ensure_dfv $state_machine $id $dfvars { ($x (,) ...) } ;
@@ -836,7 +836,13 @@ macro step_state_line_with_ensure_dfv {
         step_state_line $task $state_machine $id $dfvars { retry ; } { $rest ... }
     }
 
+    rule { $task $state_machine $id $dfvars { $x:ident = $y ... ; } { $rest ... } } => {
+        ensure_dfv $state_machine $id $dfvars { $y ... } ;
+        step_state_line $task $state_machine $id $dfvars { $x = $y ... ; } { $rest ... }
+    }
+
     rule { $task $state_machine $id $dfvars { $x ... ; } { $rest ... } } => {
+        ensure_dfv $state_machine $id $dfvars { $x ... } ;
         step_state_line $task $state_machine $id $dfvars { $x ... ; } { $rest ... }
     }
 }
@@ -941,23 +947,6 @@ macro step_state_line {
         };
     }
 
-    // ### Data flow binding
-    //
-    // Statements of the form "X := y;", where "X" is an identifier and "y" is an expression,
-    // cause "X" to be interpreted as a "data flow variable" - i.e. a "promise" - that will
-    // be resolved to the value computed by the "y" expression.
- 
-    case { $me $task $state_machine $id $dfvars { $x:ident := $y:expr; } { $rest ... } } => {
-        var id = unwrapSyntax(#{$id});
-        letstx $id2 = [makeValue(id + 1, #{$id})];
-        return #{
-            var tmp = $y;
-            $x = $state_machine.dfbind($x, tmp);
-            case $id2:
-            step_state $task $state_machine $id2 $dfvars { $rest ... }
-        };
-    }
-
     // ### State variable declaration
     //
     // State variables are shared with expressions in the entire task and can be
@@ -988,6 +977,23 @@ macro step_state_line {
             step_state $task $state_machine $id2 $dfvars { $rest ... }			
         };
     }	
+
+    // ### Data flow binding
+    //
+    // Statements of the form "X := y;", where "X" is an identifier and "y" is an expression,
+    // cause "X" to be interpreted as a "data flow variable" - i.e. a "promise" - that will
+    // be resolved to the value computed by the "y" expression.
+ 
+    case { $me $task $state_machine $id $dfvars { $x:ident := $y:expr; } { $rest ... } } => {
+        var id = unwrapSyntax(#{$id});
+        letstx $id2 = [makeValue(id + 1, #{$id})];
+        return #{
+            var tmp = $y;
+            $x = $state_machine.dfbind($x, tmp);
+            case $id2:
+            step_state $task $state_machine $id2 $dfvars { $rest ... }
+        };
+    }
 
 
     // ### Returning values from a task
