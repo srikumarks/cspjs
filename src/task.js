@@ -241,13 +241,16 @@ macro post_declare {
 // local anyway.
 
 macro setup_state_machine {
-    rule { $task $callback $formals { $body ... } } => {
-        var StateMachine = arguments.callee.StateMachine || (arguments.callee.StateMachine = require('cspjs/src/state_machine'));
-        declare_state_arguments $formals
-        var state_machine = new StateMachine(this, $callback, state_machine_fn, arguments.callee);
-        declare_state_variables $task state_machine 0 ($callback) () { $body ... } { $body ... } 
-        state_machine.start();
-        return state_machine.controlAPIMaker;
+    case { $me $task $callback $formals { $body ... } } => {
+        letstx $state_machine_fn = [makeIdent("state_machine_fn", #{$task})];
+        return #{
+            var StateMachine = arguments.callee.StateMachine || (arguments.callee.StateMachine = require('cspjs/src/state_machine'));
+            declare_state_arguments $formals
+            var state_machine = new StateMachine(this, $callback, $state_machine_fn, arguments.callee);
+            declare_state_variables $task state_machine 0 ($callback) () { $body ... } { $body ... } 
+            state_machine.start();
+            return state_machine.controlAPIMaker;
+        };
     }
 }
 
@@ -312,10 +315,11 @@ macro declare_unique_varset {
 		pvarnames.forEach(function (v) { uniqpvarnames['%' + v] = true; });
 		letstx $uvars ... = Object.keys(uniqvarnames).map(function (v) { return makeIdent(v.substring(1), #{$task}); });
 		letstx $upvars ... = Object.keys(uniqpvarnames).map(function (v) { return makeIdent(v.substring(1), #{$task}); });
+        letstx $state_machine_fn = [makeIdent("state_machine_fn", #{$task})];
 		return #{ 
             declare_varset $task $state_machine $fin ($uvars ...) ;
             declare_pvarset $task $state_machine ($upvars ...) ;
-            post_declare $task $state_machine state_machine_fn ($upvars ...) { $body ... }
+            post_declare $task $state_machine $state_machine_fn ($upvars ...) { $body ... }
         };
 	}
 }
@@ -342,7 +346,7 @@ macro declare_pvarset {
     }
     case { _ $task $state_machine ($u ...) ; } => {
         return #{
-            $($u = $u || $state_machine.dfvar();) ...
+            $($u = $state_machine.dfvar($u, function (v) { $u = v; });) ...
         };
     }
 }
@@ -360,7 +364,7 @@ macro declare_state_variables_step {
 	rule { $task $state_machine $fin ($v ...) $us { $body ... } { var $($x:ident = $y:expr) (,) ... ; } { $rest ... } } => {
 		declare_state_variables $task $state_machine $fin ($x ... $v ...) $us { $body ... } { $rest ... }
 	}
-	rule { $task $state_machine $fin ($v ...) $us { $body ... } { var $x:ident (,) ... ; } { $rest ... } } => {
+	rule { $task $state_machine $fin $vs ($u ...) { $body ... } { var $x:ident (,) ... ; } { $rest ... } } => {
 		declare_state_variables $task $state_machine $fin $vs ($x ... $u ...) { $body ... } { $rest ... }
 	}
 	rule { $task $state_machine $fin $vs $us { $body ... } { $x ... ; } { $rest ... } } => {
@@ -945,7 +949,7 @@ macro step_state_line {
         letstx $id2 = [makeValue(id + 1, #{$id})];
         return #{
             var tmp = $y;
-            $x = $state_machine.dfbind($x, tmp, function (val) { return ($x = val); });
+            $x = $state_machine.dfbind($x, tmp);
             case $id2:
             step_state $task $state_machine $id2 $dfvars { $rest ... }
         };

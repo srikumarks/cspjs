@@ -293,11 +293,24 @@ function DataFlowVar() {
 }
 
 // Makes a new dataflow variable.
-StateMachine.prototype.dfvar = function () {
-    return new DataFlowVar();
+StateMachine.prototype.dfvar = function (v, binder) {
+    if (v && v.constructor === DataFlowVar) {
+        v.promise.then(binder);
+        return v;
+    }
+
+    var dfv = new DataFlowVar();
+
+    if (v && v.then) {
+        v.then(dfv.resolve, dfv.reject);
+    }
+
+    dfv.promise.then(binder);
+
+    return dfv;
 };
 
-StateMachine.prototype.dfbind = function (dfv, val, binder) {
+StateMachine.prototype.dfbind = function (dfv, val) {
     var sm = this;
     if (dfv && dfv.constructor === DataFlowVar) {
         if (val && val.then) {
@@ -307,7 +320,6 @@ StateMachine.prototype.dfbind = function (dfv, val, binder) {
         } else {
             dfv.resolve(val);
         }
-        binder && dfv.promise.then(binder);
         return dfv;
     }
     return val;
