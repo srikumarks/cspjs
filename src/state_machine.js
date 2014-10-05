@@ -279,5 +279,57 @@ StateMachine.prototype.jumpTable = function (id, cases, blockSizes) {
     return this.task_fn.cachedJumpTable[id] = new JumpTable(id, cases, blockSizes);
 };
 
+function DFVar() {
+    var self = this;
+    this.promise = null;
+    this.resolve = null;
+    this.reject = null;
+    this.promise = new Promise(function (resolve, reject) {
+        self.resolve = resolve;
+        self.reject = reject;
+    });
+}
+
+DFVar.prototype.bind = function (val) {
+    var dfv = this;
+    if (val && val.then) {
+        val.then(function (v) { dfv.resolve(v); }, function (err) { dfv.reject(err); });
+    } else if (val && val.constructor === DFVar) {
+        val.promise.then(function (v) { dfv.resolve(v); }, function (e) { dfv.reject(e); });
+    } else {
+        dfv.resolve(val);
+    }
+    return val;
+};
+
+// Makes a new dataflow variable.
+StateMachine.prototype.dfvar = function () {
+    return new DFVar();
+};
+
+StateMachine.prototype.dfbind = function (dfv, val) {
+    var sm = this;
+    if (dfv && dfv.constructor === DFVar) {
+        return dfv.bind(val);
+    }
+    return val;
+};
+
+StateMachine.prototype.isDFVar = function (x) {
+    return x && (x.constructor === DFVar);
+};
+
+StateMachine.prototype.ensure = function (id) {
+    var sm = this, f = null;
+    for (var i = 1; i < arguments.length; ++i) {
+        var a = arguments[i];
+        if (a && a.constructor === DFVar) {
+            f = f || sm.thenTo(id);
+            a.promise.then(function (val) { f(sm.state.dfErr || null); }, function (err) { f(sm.state.dfErr = err); });
+            return false;
+        }
+    } 
+    return true;
+};
 
 module.exports = StateMachine;

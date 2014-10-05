@@ -15,8 +15,59 @@
 // The macro supports the following four forms to provide easy expression of
 // pure no-argument scripts and named tasks.
 
-macro task {
+macro ensure_dfv {
+    case { $me $state_machine $id $dfvars { $x:expr } ; } => {
+        function dfvars(stx, test) {
+            var result = {};
+            function scan(stx) {
+                if (stx && stx.token) {
+                    if (stx.token.type === 3 && test['%'+stx.token.value]) {
+                        result['%'+stx.token.value] = true;
+                    } else if (stx.token.inner) {
+                        stx.token.inner.forEach(scan);
+                    }
+                } else if (stx) {
+                    stx.forEach(scan);
+                }
+                return result;
+            }
+            console.log("BEFORE");
+            var r = Object.keys(scan(stx)).map(function (v) { return test[v]; });
+            console.log("AFTER", JSON.stringify(result));
+            return r;
+        }
+        function dftester(stx) {
+            console.log(require('util').inspect(stx, {depth: 10}))
+            var result = {};
+            stx[0].token.inner.forEach(function (v) {
+                result['%'+v.token.value] = v;
+            });
+            return result;
+        }
+        var dfvarnames = dftester(#{$dfvars});
+        console.log('dfvarnames', dfvarnames);
+        if (dfvarnames) {
+            console.log("BEFORE2");
+            var dfvs = dfvars(#{$x}, dfvarnames);
+            console.log("BEFORE3");
+            if (dfvs.length > 0) {
+                letstx $pvars ... = dfvs ;
+                console.log("HERE");
+                return #{
+                    if (!$state_machine.ensure($id, $pvars (,) ...)) { break; }
+                };
+            } else {
+                console.log('ensure_dfv - no dfvarnames after filtering!')
+                return #{};
+            }
+        } else {
+            console.log('ensure_dfv - no dfvarnames!')
+            return #{};
+        }
+    }
+}
 
+macro task {
    
     // 1. `task { body ... }` produces a `function (callback) { ... }` expression
     // 2. `task name { body ... }` produces a `function name(callback) { ... }` declaration.
@@ -63,6 +114,26 @@ macro task {
             }
         };
     }                  
+}
+
+macro post_declare {
+    rule { $task $state_machine $state_machine_fn $dfvars { $body ... } } => {
+        function $state_machine_fn(err) {
+            if (err && !$state_machine.state.isUnwinding) { return $state_machine.callback(err); }
+            try {
+                switch ($state_machine.state.id) {
+                    case 1:
+                        // `step_state` is the real work horse, which
+                        // walks through each statement in the task
+                        // body and compiles it to a single step in
+                        // the state machine.
+                        step_state $task $state_machine 1 $dfvars { $body ... }
+                }
+            } catch (e) {
+                $state_machine.callback(e);
+            }
+        }
+    }
 }
 
 // A "task" consists of a sequence of "statements" separated by ";".  Each
@@ -157,24 +228,9 @@ macro task {
 macro setup_state_machine {
     rule { $task $callback $formals { $body ... } } => {
         var StateMachine = arguments.callee.StateMachine || (arguments.callee.StateMachine = require('cspjs/src/state_machine'));
-        declare_state_arguments $formals ;
+        declare_state_arguments $formals
         var state_machine = new StateMachine(this, $callback, state_machine_fn, arguments.callee);
-        declare_state_variables $task state_machine 0 ($callback) { $body ... } 
-        function state_machine_fn(err) {
-            if (err && !state_machine.state.isUnwinding) { return state_machine.callback(err); }
-            try {
-                switch (state_machine.state.id) {
-                    case 1:
-                        // `step_state` is the real work horse, which
-                        // walks through each statement in the task
-                        // body and compiles it to a single step in
-                        // the state machine.
-                        step_state $task state_machine 1 { $body ... }
-                }
-            } catch (e) {
-                state_machine.callback(e);
-            }
-        }
+        declare_state_variables $task state_machine 0 ($callback) () { $body ... } { $body ... } 
         state_machine.start();
         return state_machine.controlAPIMaker;
     }
@@ -187,43 +243,43 @@ macro setup_state_machine {
 // to the `declare_state_variables` macro is expected to match this.
 
 macro declare_state_variables {
-    rule { $task $state_machine $fin $vars { if ($x ...) { $then ... } else { $else ... } $rest ... } } => {
-        declare_state_variables $task $state_machine $fin $vars { $then ... $else ... $rest ... }
+    rule { $task $state_machine $fin $vars $dfvars { $body ... } { if ($x ...) { $then ... } else { $else ... } $rest ... } } => {
+        declare_state_variables $task $state_machine $fin $vars $dfvars { $body ... } { $then ... $else ... $rest ... }
     }
-    rule { $task $state_machine $fin $vars { if ($x ...) { $then ... }  $rest ... } } => {
-        declare_state_variables $task $state_machine $fin $vars { $then ... $rest ... }
+    rule { $task $state_machine $fin $vars $dfvars { $body ... } { if ($x ...) { $then ... }  $rest ... } } => {
+        declare_state_variables $task $state_machine $fin $vars $dfvars { $body ... } { $then ... $rest ... }
     }
     // Rewrite for loops using while.
-    rule { $task $state_machine $fin $vars { for ($init ... ; $cond ... ; $next ...) { $body ... }  $rest ... } } => {
-        declare_state_variables $task $state_machine $fin $vars { $init ... ; while ($cond ...) { $body ... $next ... ; } $rest ... }
+    rule { $task $state_machine $fin $vars $dfvars { $body ... } { for ($init ... ; $cond ... ; $next ...) { $body ... }  $rest ... } } => {
+        declare_state_variables $task $state_machine $fin $vars $dfvars { $body ... } { $init ... ; while ($cond ...) { $body ... $next ... ; } $rest ... }
     }
-    rule { $task $state_machine $fin $vars { while ($x ...) { $body ... }  $rest ... } } => {
-        declare_state_variables $task $state_machine $fin $vars { $body ... $rest ... }
+    rule { $task $state_machine $fin $vars $dfvars { $body ... } { while ($x ...) { $body ... }  $rest ... } } => {
+        declare_state_variables $task $state_machine $fin $vars $dfvars { $body ... } { $body ... $rest ... }
     }
     // If a finally block is encountered somewhere in the body, then we
     // need to be able to save and restore state variables. So keep track of that.
-    rule { $task $state_machine $fin $vars { finally { $cleanup ... } $rest ... } } => {
-        declare_state_variables $task $state_machine 1 $vars { $cleanup ... $rest ... }
+    rule { $task $state_machine $fin $vars $dfvars { $body ... } { finally { $cleanup ... } $rest ... } } => {
+        declare_state_variables $task $state_machine 1 $vars $dfvars { $body ... } { $cleanup ... $rest ... }
     }
-    rule { $task $state_machine $fin $vars { finally $cleanup ... ($args:expr (,) ...) ; $rest ... } } => {
-        declare_state_variables $task $state_machine $fin $vars { $rest ... }
+    rule { $task $state_machine $fin $vars $dfvars { $body ... } { finally $cleanup ... ($args:expr (,) ...) ; $rest ... } } => {
+        declare_state_variables $task $state_machine $fin $vars $dfvars { $body ... } { $rest ... }
     }
-    rule { $task $state_machine $fin $vars { catch ($eclass:ident $e:ident) { $handler ... } $rest ... } } => {
-        declare_state_variables $task $state_machine $fin $vars { var $e = null ; $handler ... $rest ... }
+    rule { $task $state_machine $fin $vars $dfvars { $body ... } { catch ($eclass:ident $e:ident) { $handler ... } $rest ... } } => {
+        declare_state_variables $task $state_machine $fin $vars $dfvars { $body ... } { var $e = null ; $handler ... $rest ... }
     }
-    rule { $task $state_machine $fin $vars { catch ($e:ident) { $handler ... } $rest ... } } => {
-        declare_state_variables $task $state_machine $fin $vars { var $e = null ; $handler ... $rest ... }
+    rule { $task $state_machine $fin $vars $dfvars { $body ... } { catch ($e:ident) { $handler ... } $rest ... } } => {
+        declare_state_variables $task $state_machine $fin $vars $dfvars { $body ... } { var $e = null ; $handler ... $rest ... }
     }
-    rule { $task $state_machine $fin $vars { switch ($x ...) { $(case $ix:lit (,) ... : { $body ... }) ... } $rest ... } } => {
-        declare_state_variables $task $state_machine $fin $vars { $($body ...) ... $rest ... }
+    rule { $task $state_machine $fin $vars $dfvars { $body ... } { switch ($x ...) { $(case $ix:lit (,) ... : { $body ... }) ... } $rest ... } } => {
+        declare_state_variables $task $state_machine $fin $vars $dfvars { $body ... } { $($body ...) ... $rest ... }
     }
-    rule { $task $state_machine $fin $vars { $step ... ; $rest ... } } => {
-        declare_state_variables_step $task $state_machine $fin $vars { $step ... ; } { $rest ... }
+    rule { $task $state_machine $fin $vars $dfvars { $body ... } { $step ... ; $rest ... } } => {
+        declare_state_variables_step $task $state_machine $fin $vars $dfvars { $body ... } { $step ... ; } { $rest ... }
     }
-    rule { $task $state_machine $fin $vars { } } => { 
-        declare_unique_varset $task $state_machine $fin $vars ;
+    rule { $task $state_machine $fin $vars $dfvars { $body ... } { } } => { 
+        declare_unique_varset $task $state_machine $fin $vars $dfvars { $body ... } 
     }
-    rule { $task $state_machine $fin () { } } => { 
+    rule { $task $state_machine $fin () () { $body ... } { } } => { 
     }
 }
 
@@ -233,13 +289,20 @@ macro declare_state_variables {
 // as much as we can.
 
 macro declare_unique_varset {
-	case { _ $task $state_machine $fin ($v ...) } => {
-		var vars = #{$v ...};
-		var varnames = vars.map(unwrapSyntax);
-		var uniqvarnames = {};
+	case { _ $task $state_machine $fin ($v ...) ($u ...) { $body ... } } => {
+		var vars = #{$v ... $u ...};
+		var varnames = vars.map(unwrapSyntax), pvarnames = (#{$u ...}).map(unwrapSyntax);
+		var uniqvarnames = {}, uniqpvarnames = {};
 		varnames.forEach(function (v) { uniqvarnames['%' + v] = true; });
+		pvarnames.forEach(function (v) { uniqpvarnames['%' + v] = true; });
 		letstx $uvars ... = Object.keys(uniqvarnames).map(function (v) { return makeIdent(v.substring(1), #{$task}); });
-		return #{ declare_varset $task $state_machine $fin ($uvars ...) ; };
+		letstx $upvars ... = Object.keys(uniqpvarnames).map(function (v) { return makeIdent(v.substring(1), #{$task}); });
+		return #{ 
+            declare_varset $task $state_machine $fin ($uvars ...) ;
+            declare_pvarset $task $state_machine ($upvars ...) ;
+            $state_machine.state.dfErr = null;
+            post_declare $task $state_machine state_machine_fn ($upvars ...) { $body ... }
+        };
 	}
 }
 
@@ -259,18 +322,32 @@ macro declare_varset {
     }
 }
 
+macro declare_pvarset {
+    case { _ $task $state_machine () ; } => {
+        return #{};
+    }
+    case { _ $task $state_machine ($u ...) ; } => {
+        return #{
+            $($u = $u || $state_machine.dfvar();) ...
+        };
+    }
+}
+
 macro declare_state_variables_step {
-	rule { $task $state_machine $fin ($v ...) { $x:ident <- $y ... ; } { $rest ... } } => {
-		declare_state_variables $task $state_machine $fin ($x $v ...) { $rest ... }
+	rule { $task $state_machine $fin ($v ...) ($u ...) { $body ... } { $x:ident <- $y ... ; } { $rest ... } } => {
+		declare_state_variables $task $state_machine $fin ($x $v ...) ($u ...) { $body ... } { $rest ... }
 	}
-	rule { $task $state_machine $fin ($v ...) { $x:ident (,) ... <- $y ... ; } { $rest ... } } => {
-		declare_state_variables $task $state_machine $fin ($x ... $v ...) { $rest ... }
+	rule { $task $state_machine $fin ($v ...) $us { $body ... } { $x:ident (,) ... <- $y ... ; } { $rest ... } } => {
+		declare_state_variables $task $state_machine $fin ($x ... $v ...) $us { $body ... } { $rest ... }
 	}
-	rule { $task $state_machine $fin ($v ...) { var $($x:ident = $y:expr) (,) ... ; } { $rest ... } } => {
-		declare_state_variables $task $state_machine $fin ($x ... $v ...) { $rest ... }
+	rule { $task $state_machine $fin $vs ($u ...) { $body ... } { $x:ident := $y ... ; } { $rest ... } } => {
+		declare_state_variables $task $state_machine $fin $vs ($x $u ...) { $body ... } { $rest ... }
 	}
-	rule { $task $state_machine $fin $vs { $x ... ; } { $rest ... } } => {
-		declare_state_variables $task $state_machine $fin $vs { $rest ... }
+	rule { $task $state_machine $fin ($v ...) $us { $body ... } { var $($x:ident = $y:expr) (,) ... ; } { $rest ... } } => {
+		declare_state_variables $task $state_machine $fin ($x ... $v ...) $us { $body ... } { $rest ... }
+	}
+	rule { $task $state_machine $fin $vs $us { $body ... } { $x ... ; } { $rest ... } } => {
+		declare_state_variables $task $state_machine $fin $vs $us { $body ... } { $rest ... }
 	}
 }
 
@@ -291,35 +368,35 @@ macro declare_state_arguments {
 // to traditional javascript as possible.
 
 macro step_state {
-    rule { $task $state_machine $id { if ($x ...) { $then ... } else { $else ... } $rest ... } } => {
+    rule { $task $state_machine $id $dfvars { if ($x ...) { $then ... } else { $else ... } $rest ... } } => {
         step_state_line_if_else $task $state_machine $id { if ($x ...) { $then ... } else { $else ... } } { $rest ... }
     }
-    rule { $task $state_machine $id { if ($x ...) { $then ... }  $rest ... } } => {
+    rule { $task $state_machine $id $dfvars { if ($x ...) { $then ... }  $rest ... } } => {
         step_state_line_if $task $state_machine $id { if ($x ...) { $then ... } } { $rest ... }
     }
     // Rewrite for loops using while.
-    rule { $task $state_machine $id { for ($init ... ; $cond ... ; $next ...) { $body ... }  $rest ... } } => {
+    rule { $task $state_machine $id $dfvars { for ($init ... ; $cond ... ; $next ...) { $body ... }  $rest ... } } => {
         step_state $task $state_machine $id { $init ... ; while ($cond ...) { $body ... $next ... ; } $rest ... }
     }
-    rule { $task $state_machine $id { while ($x ...) { $body ... }  $rest ... } } => {
+    rule { $task $state_machine $id $dfvars { while ($x ...) { $body ... }  $rest ... } } => {
         step_state_line_while $task $state_machine $id { while ($x ...) { $body ... } } { $rest ... }
     }
-    rule { $task $state_machine $id { finally { $cleanup ... }  $rest ... } } => {
+    rule { $task $state_machine $id $dfvars { finally { $cleanup ... }  $rest ... } } => {
         step_state_line_finally_block $task $state_machine $id { finally { $cleanup ... } } { $rest ... }
     }
-    rule { $task $state_machine $id { finally $cleanup ... ($args:expr (,) ...) ;  $rest ... } } => {
+    rule { $task $state_machine $id $dfvars { finally $cleanup ... ($args:expr (,) ...) ;  $rest ... } } => {
         step_state_line_finally_expr $task $state_machine $id { finally $cleanup ... ($args (,) ...) ; } { $rest ... }
     }
-    rule { $task $state_machine $id { catch ($x ...) { $handler ... }  $rest ... } } => {
+    rule { $task $state_machine $id $dfvars { catch ($x ...) { $handler ... }  $rest ... } } => {
         step_state_line_catch $task $state_machine $id { catch ($x ...) { $handler ... } } { $rest ... }
     }
-    rule { $task $state_machine $id { switch ($x:expr) { $b ... } $rest ... } } => {
+    rule { $task $state_machine $id $dfvars { switch ($x:expr) { $b ... } $rest ... } } => {
         step_state_line_switch $task $state_machine $id { switch ($x) { $b ... } } { $rest ... }
     }
-    rule { $task $state_machine $id { $step ... ; $rest ... } } => {
-        step_state_line $task $state_machine $id { $step ... ; } { $rest ... }
+    rule { $task $state_machine $id $dfvars { $step ... ; $rest ... } } => {
+        step_state_line_with_ensure_dfv $task $state_machine $id $dfvars { $step ... ; } { $rest ... }
     }
-    rule { $task $state_machine $id { } } => {
+    rule { $task $state_machine $id $dfvars { } } => {
         $state_machine.callback(null, true);
         break;
     }
@@ -382,6 +459,9 @@ macro count_states_line {
     }
     rule { $task ($n ...) { $x:ident (,) ... <- $y ... ($args:expr (,) ...); } { $rest ... } } => {
         count_states $task (2 $n ...) { $rest ... }
+    }
+    rule { $task ($n ...) { $x:ident := $y:expr ; } { $rest ... } } => {
+        count_states $task (1 $n ...) { $rest ... }
     }
     rule { $task ($n ...) { $step ... ; } { $rest ... } } => {
         count_states $task (1 $n ...) { $rest ... }
@@ -625,6 +705,120 @@ macro step_state_line_catch {
     }
 }
 
+macro step_state_line_with_ensure_dfv {
+    // ### await
+    //
+    // The `await func(args...);` clause is a synonym for `<- func(args...);`.
+    rule { $task $state_machine $id $dfvars { await $y ... (); } { $rest ... } } => {
+        ensure_dfv $state_machine $id $dfvars { $y ... } ;
+        step_state_line $task $state_machine $id $dfvars { await $y ... (); } { $rest ... }
+    }
+
+    rule { $task $state_machine $id $dfvars { await $y ... ($args:expr (,) ...); } { $rest ... } } => {
+        ensure_dfv $state_machine $id $dfvars { $y ... } ;
+        ensure_dfv $state_machine $id $dfvars { ($args (,) ...) } ;
+        step_state_line $task $state_machine $id $dfvars { await $y ... ($args (,) ...); } { $rest ... }
+    }
+
+    // ### Taking values from channels
+    //
+    // If you have functions that return channels on which they will produce their results,
+    // then you can use this expression as syntax sugar to get the value out of the returned
+    // channel.
+    //
+    //      val <- chan someProcess(arg1, arg1);
+
+    rule { $task $state_machine $id $dfvars { $x:ident (,) ... <- chan $y ... ; } { $rest ... } } => {
+        ensure_dfv $state_machine $id $dfvars { $y ... } ;
+        step_state_line $task $state_machine $id $dfvars { $x (,) ... <- chan $y ... ; } { $rest ... }
+    }
+
+    // ### Retrieving values
+    //
+    // Values are retrieved from async steps using the `<-` clause of the form -
+    //
+    //      x, y, z <- coll[42].thing.asyncMethod(arg1, arg2);
+    //
+    // This block and the following are basically the same. The problem is that I don't know
+    // how to insert the additional callback argument with a preceding comma in one
+    // case and without one in the other.
+    rule { $task $state_machine $id $dfvars { $x:ident (,) ... <- $y ... (); } { $rest ... } } => {
+        ensure_dfv $state_machine $id $dfvars { $y ... } ;
+        step_state_line $task $state_machine $id $dfvars { $x (,) ... <- $y ... (); } { $rest ... }
+    }
+
+    rule { $task $state_machine $id $dfvars { $x:ident (,) ... <- $y ... ($args:expr (,) ...); } { $rest ... } } => {
+        ensure_dfv $state_machine $id $dfvars { $y ... } ;
+        ensure_dfv $state_machine $id $dfvars { ($args (,) ...) } ;
+        step_state_line $task $state_machine $id $dfvars { $x (,) ... <- $y ... ($args (,) ...); } { $rest ... }
+    }
+
+    rule { $task $state_machine $id $dfvars { $x:ident := $y:expr; } { $rest ... } } => {
+        ensure_dfv $state_machine $id $dfvars { $y } ;
+        step_state_line $task $state_machine $id $dfvars { $x := $y; } { $rest ... }
+    }
+
+    // ### State variable declaration
+    //
+    // State variables are shared with expressions in the entire task and can be
+    // declared anywhere using var statements. Initializers are compulsory.
+
+    rule { $task $state_machine $id $dfvars { var $($x:ident = $y:expr) (,) ... ; } { $rest ... } } => {
+        ensure_dfv $state_machine $id $dfvars { ($y (,) ...) };
+        step_state_line $task $state_machine $id $dfvars { var $($x = $y) (,) ... ; } { $rest ... }
+    }	
+
+    // ### Returning values from a task
+    //
+    // `return x, y, ...;` will result in the task winding back up any
+    // `finally` actions and then providing the given values to the next task
+    // by calling the last callback argument to the task. Such a statement
+    // will, obviously, return from within any block within control structures.
+    //
+    // Though you can return from anywhere in this implementation, don't return
+    // from within finally clauses.
+
+    rule { $task $state_machine $id $dfvars { return $x:expr (,) ... ; } { $rest ... } } => {
+        ensure_dfv $state_machine $id $dfvars { ($x (,) ...) } ;
+        step_state_line $task $state_machine $id $dfvars { return $x (,) ... ; } { $rest ... }
+    }
+
+    // ### Raising errors
+    //
+    // The usual `throw err;` form will cause the error to first bubble up
+    // the `finally` actions and the installed `catch` sequence and if the
+    // error survives them all, will be passed on to the task's callback.
+    //
+    // Hack: "throw object.err;" can be used as a short hand for
+    // "if (object.err) { throw object.err; }". i.e. the error is thrown
+    // only if it is not null or undefined or false. This fits with Node.js's
+    // callback convention where `err === null` tests whether there is an
+    // error or not. So throwing a `null` doesn't make sense.
+
+    rule { $task $state_machine $id $dfvars { throw $e:expr ; } { $rest ... } } => {
+        ensure_dfv $state_machine $id $dfvars { $e } ;
+        step_state_line $task $state_machine $id $dfvars { throw $e ; } { $rest ... }
+    }
+
+    // ### Retrying a failed operation.
+    //
+    // Within a catch block, you can use the retry statement 
+    //
+    //      retry;
+    // 
+    // to jump control again to the beginning of the code that
+    // the catch block traps errors for ... which is immediately
+    // after the ending brace of the catch block.
+
+    rule { $task $state_machine $id $dfvars { retry ; } { $rest ... } } => {
+        step_state_line $task $state_machine $id $dfvars { retry ; } { $rest ... }
+    }
+
+    rule { $task $state_machine $id $dfvars { $x ... ; } { $rest ... } } => {
+        step_state_line $task $state_machine $id $dfvars { $x ... ; } { $rest ... }
+    }
+}
+
 // ## step_state_line
 //
 // This is the real work horse which walks through each statement and compiles
@@ -634,25 +828,25 @@ macro step_state_line {
     // ### await
     //
     // The `await func(args...);` clause is a synonym for `<- func(args...);`.
-    case { $me $task $state_machine $id { await $y ... (); } { $rest ... } } => {
+    case { $me $task $state_machine $id $dfvars { await $y ... (); } { $rest ... } } => {
         var id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + 1, #{$id})];
         return #{
             $y ... ($state_machine.thenTo($id2));
             break;
             case $id2:
-            step_state $task $state_machine $id2 { $rest ... }
+            step_state $task $state_machine $id2 $dfvars { $rest ... }
         };
     }
 
-    case { $me $task $state_machine $id { await $y ... ($args:expr (,) ...); } { $rest ... } } => {
+    case { $me $task $state_machine $id $dfvars { await $y ... ($args:expr (,) ...); } { $rest ... } } => {
         var id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + 1, #{$id})];
         return #{
             $y ... ($args (,) ... , $state_machine.thenTo($id2));
             break;
             case $id2:
-            step_state $task $state_machine $id2 { $rest ... }
+            step_state $task $state_machine $id2 $dfvars { $rest ... }
         };
     }
 
@@ -664,7 +858,7 @@ macro step_state_line {
     //
     //      val <- chan someProcess(arg1, arg1);
 
-    case { $me $task $state_machine $id { $x:ident (,) ... <- chan $y ... ; } { $rest ... } } => {
+    case { $me $task $state_machine $id $dfvars { $x:ident (,) ... <- chan $y ... ; } { $rest ... } } => {
         var id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + 1, #{$id})], $id3 = [makeValue(id + 2, #{$id})];
         // In this form (ex: z <- chan blah[32].bling(); ), the expression is expected to
@@ -684,7 +878,7 @@ macro step_state_line {
             var i = 1;
             $($x = arguments[i++];) ...
             case $id3:
-                step_state $task $state_machine $id3 { $rest ... }
+                step_state $task $state_machine $id3 $dfvars { $rest ... }
         };
     }
 
@@ -697,7 +891,7 @@ macro step_state_line {
     // This block and the following are basically the same. The problem is that I don't know
     // how to insert the additional callback argument with a preceding comma in one
     // case and without one in the other.
-    case { $me $task $state_machine $id { $x:ident (,) ... <- $y ... (); } { $rest ... } } => {
+    case { $me $task $state_machine $id $dfvars { $x:ident (,) ... <- $y ... (); } { $rest ... } } => {
         var id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + 1, #{$id})], $id3 = [makeValue(id + 2, #{$id})];
         return #{
@@ -707,11 +901,11 @@ macro step_state_line {
             var i = 1;
             $($x = arguments[i++];) ...
             case $id3:
-                step_state $task $state_machine $id3 { $rest ... }
+                step_state $task $state_machine $id3 $dfvars { $rest ... }
         };
     }
 
-    case { $me $task $state_machine $id { $x:ident (,) ... <- $y ... ($args:expr (,) ...); } { $rest ... } } => {
+    case { $me $task $state_machine $id $dfvars { $x:ident (,) ... <- $y ... ($args:expr (,) ...); } { $rest ... } } => {
         var id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + 1, #{$id})], $id3 = [makeValue(id + 2, #{$id})];
         return #{
@@ -721,7 +915,19 @@ macro step_state_line {
             var i = 1;
             $($x = arguments[i++];) ...
             case $id3:
-                step_state $task $state_machine $id3 { $rest ... }
+                step_state $task $state_machine $id3 $dfvars { $rest ... }
+        };
+    }
+
+    case { $me $task $state_machine $id $dfvars { $x:ident := $y:expr; } { $rest ... } } => {
+        var id = unwrapSyntax(#{$id});
+        letstx $id2 = [makeValue(id + 1, #{$id})];
+        return #{
+            var tmp = $y;
+            $x = $state_machine.dfbind($x, tmp);
+            if ($state_machine.isDFVar($x)) { $x.promise.then(function (val) { return ($x = val); }, function (err) { $state_machine.state.dfErr = err; }); }
+            case $id2:
+            step_state $task $state_machine $id2 $dfvars { $rest ... }
         };
     }
 
@@ -730,13 +936,13 @@ macro step_state_line {
     // State variables are shared with expressions in the entire task and can be
     // declared anywhere using var statements. Initializers are compulsory.
 
-    case { $me $task $state_machine $id { var $($x:ident = $y:expr) (,) ... ; } { $rest ... } } => {
+    case { $me $task $state_machine $id $dfvars { var $($x:ident = $y:expr) (,) ... ; } { $rest ... } } => {
         var id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + 1, #{$id})];
         return #{
             $($x = $y;) ...
             case $id2:
-            step_state $task $state_machine $id2 { $rest ... }			
+            step_state $task $state_machine $id2 $dfvars { $rest ... }			
         };
     }	
 
@@ -750,14 +956,14 @@ macro step_state_line {
     // Though you can return from anywhere in this implementation, don't return
     // from within finally clauses.
 
-    case { $me $task $state_machine $id { return $x:expr (,) ... ; } { $rest ... } } => {
+    case { $me $task $state_machine $id $dfvars { return $x:expr (,) ... ; } { $rest ... } } => {
         var id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + 1, #{$id})];
         return #{
             $state_machine.callback(null, $x (,) ...);
             break;
             case $id2:
-            step_state $task $state_machine $id2 { $rest ... }			
+            step_state $task $state_machine $id2 $dfvars { $rest ... }			
         };
     }
 
@@ -773,14 +979,14 @@ macro step_state_line {
     // callback convention where `err === null` tests whether there is an
     // error or not. So throwing a `null` doesn't make sense.
 
-    case { $me $task $state_machine $id { throw $e:expr ; } { $rest ... } } => {
+    case { $me $task $state_machine $id $dfvars { throw $e:expr ; } { $rest ... } } => {
         var id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + 1, #{$id})];
         return #{
             var tmp1 = $e;
             if (tmp1) { $state_machine.callback(tmp1); break; }
             case $id2:
-            step_state $task $state_machine $id2 { $rest ... }			
+            step_state $task $state_machine $id2 $dfvars { $rest ... }			
         };
     }
 
@@ -794,17 +1000,16 @@ macro step_state_line {
     // the catch block traps errors for ... which is immediately
     // after the ending brace of the catch block.
 
-    case { $me $task $state_machine $id { retry ; } { $rest ... } } => {
+    case { $me $task $state_machine $id $dfvars { retry ; } { $rest ... } } => {
         var id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + 1, #{$id})];
         return #{
             $state_machine.retry();
             break;
             case $id2:
-            step_state $task $state_machine $id2 { $rest ... }	
+            step_state $task $state_machine $id2 $dfvars { $rest ... }	
         };
     }
-
 
     // ## Internals
     //
@@ -812,14 +1017,14 @@ macro step_state_line {
     //
     // Used to merge states when branching using `if`, `while` and `switch`.
 
-    case { $me $task $state_machine $id { phi $state_machine ; } { $rest ... } } => {
+    case { $me $task $state_machine $id $dfvars { phi $state_machine ; } { $rest ... } } => {
         var id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + 1, #{$id})];
         return #{
             $state_machine.phi();
             break;
             case $id2:
-            step_state $task $state_machine $id2 { $rest ... }			
+            step_state $task $state_machine $id2 $dfvars { $rest ... }			
         };
     }
 
@@ -834,13 +1039,13 @@ macro step_state_line {
     // I may change my mind about whether or not to introduce an additional
     // async step, but that decision won't impact the meaning of the code.
 
-    case { $me $task $state_machine $id { $x ... ; } { $rest ... } } => {
+    case { $me $task $state_machine $id $dfvars { $x ... ; } { $rest ... } } => {
         var id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + 1, #{$id})];
         return #{
             $x ... ;
             case $id2:
-            step_state $task $state_machine $id2 { $rest ... }
+            step_state $task $state_machine $id2 $dfvars { $rest ... }
         };
     }
 }
