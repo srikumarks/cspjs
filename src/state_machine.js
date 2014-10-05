@@ -280,37 +280,35 @@ StateMachine.prototype.jumpTable = function (id, cases, blockSizes) {
 };
 
 function DFVar() {
+    StateMachine.Promise = StateMachine.Promise || require('bluebird');
     var self = this;
-    this.promise = null;
-    this.resolve = null;
-    this.reject = null;
-    this.promise = new Promise(function (resolve, reject) {
+    self.promise = null;
+    self.resolve = null;
+    self.reject = null;
+    
+    self.promise = new StateMachine.Promise(function (resolve, reject) {
         self.resolve = resolve;
         self.reject = reject;
     });
 }
-
-DFVar.prototype.bind = function (val) {
-    var dfv = this;
-    if (val && val.then) {
-        val.then(function (v) { dfv.resolve(v); }, function (err) { dfv.reject(err); });
-    } else if (val && val.constructor === DFVar) {
-        val.promise.then(function (v) { dfv.resolve(v); }, function (e) { dfv.reject(e); });
-    } else {
-        dfv.resolve(val);
-    }
-    return val;
-};
 
 // Makes a new dataflow variable.
 StateMachine.prototype.dfvar = function () {
     return new DFVar();
 };
 
-StateMachine.prototype.dfbind = function (dfv, val) {
+StateMachine.prototype.dfbind = function (dfv, val, binder) {
     var sm = this;
     if (dfv && dfv.constructor === DFVar) {
-        return dfv.bind(val);
+        if (val && val.then) {
+            val.then(function (v) { dfv.resolve(v); }, function (err) { dfv.reject(err); });
+        } else if (val && val.constructor === DFVar) {
+            val.promise.then(function (v) { dfv.resolve(v); }, function (e) { dfv.reject(e); });
+        } else {
+            dfv.resolve(val);
+        }
+        binder && dfv.promise.then(binder);
+        return dfv;
     }
     return val;
 };
@@ -324,8 +322,8 @@ StateMachine.prototype.ensure = function (id) {
     for (var i = 1; i < arguments.length; ++i) {
         var a = arguments[i];
         if (a && a.constructor === DFVar) {
-            f = f || sm.thenTo(id);
-            a.promise.then(function (val) { f(sm.state.dfErr || null); }, function (err) { f(sm.state.dfErr = err); });
+            f = sm.thenTo(id);
+            a.promise.then(function (val) { f(null); }, function (err) { f(err); });
             return false;
         }
     } 

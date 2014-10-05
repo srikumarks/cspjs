@@ -18,9 +18,13 @@
 // ## ensure_dfv
 //
 // Ensures that the data flow variables found in the given $x expression
-// are all bound before proceeding.
+// are all bound before proceeding. 
+//
+// WARNING: The current algorithm is alpha quality only. It is overzealous
+// and will ensure that any symbol encountered in the expression whose form
+// matches a declared data flow variable will be ensured bound before proceeding.
 macro ensure_dfv {
-    case { $me $state_machine $id $dfvars { $x:expr } ; } => {
+    case { $me $state_machine $id $dfvars { $x ... } ; } => {
         function dfvars(stx, test) {
             var result = {};
             function scan(stx) {
@@ -46,7 +50,7 @@ macro ensure_dfv {
         }
         var dfvarnames = dftester(#{$dfvars});
         if (dfvarnames) {
-            var dfvs = dfvars(#{$x}, dfvarnames);
+            var dfvs = dfvars(#{$x ...}, dfvarnames);
             if (dfvs.length > 0) {
                 letstx $pvars ... = dfvs ;
                 return #{
@@ -292,7 +296,6 @@ macro declare_unique_varset {
 		return #{ 
             declare_varset $task $state_machine $fin ($uvars ...) ;
             declare_pvarset $task $state_machine ($upvars ...) ;
-            $state_machine.state.dfErr = null;
             post_declare $task $state_machine state_machine_fn ($upvars ...) { $body ... }
         };
 	}
@@ -916,8 +919,7 @@ macro step_state_line {
         letstx $id2 = [makeValue(id + 1, #{$id})];
         return #{
             var tmp = $y;
-            $x = $state_machine.dfbind($x, tmp);
-            if ($state_machine.isDFVar($x)) { $x.promise.then(function (val) { return ($x = val); }, function (err) { $state_machine.state.dfErr = err; }); }
+            $x = $state_machine.dfbind($x, tmp, function (val) { return ($x = val); });
             case $id2:
             step_state $task $state_machine $id2 $dfvars { $rest ... }
         };
