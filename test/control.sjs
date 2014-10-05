@@ -1,4 +1,4 @@
-var Channel = require('channel');
+var Channel = require('cspjs/channel');
 var assert = require('assert');
 
 describe('errors', function () {

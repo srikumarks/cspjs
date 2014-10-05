@@ -1,5 +1,5 @@
 var assert = require('assert');
-var Channel = require('channel');
+var Channel = require('cspjs/channel');
 
 describe('Channel', function () {
     describe('#put()', function () {
