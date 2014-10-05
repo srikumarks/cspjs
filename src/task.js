@@ -360,6 +360,9 @@ macro declare_state_variables_step {
 	rule { $task $state_machine $fin ($v ...) $us { $body ... } { var $($x:ident = $y:expr) (,) ... ; } { $rest ... } } => {
 		declare_state_variables $task $state_machine $fin ($x ... $v ...) $us { $body ... } { $rest ... }
 	}
+	rule { $task $state_machine $fin ($v ...) $us { $body ... } { var $x:ident (,) ... ; } { $rest ... } } => {
+		declare_state_variables $task $state_machine $fin $vs ($x ... $u ...) { $body ... } { $rest ... }
+	}
 	rule { $task $state_machine $fin $vs $us { $body ... } { $x ... ; } { $rest ... } } => {
 		declare_state_variables $task $state_machine $fin $vs $us { $body ... } { $rest ... }
 	}
@@ -782,6 +785,10 @@ macro step_state_line_with_ensure_dfv {
         step_state_line $task $state_machine $id $dfvars { var $($x = $y) (,) ... ; } { $rest ... }
     }	
 
+    rule { $task $state_machine $id $dfvars { var $x:ident (,) ... ; } { $rest ... } } => {
+        step_state $task $state_machine $id $dfvars { $rest ... }
+    }	
+
     // ### Returning values from a task
     //
     // `return x, y, ...;` will result in the task winding back up any
@@ -958,6 +965,17 @@ macro step_state_line {
             step_state $task $state_machine $id2 $dfvars { $rest ... }			
         };
     }	
+
+    case { $me $task $state_machine $id $dfvars { var $x:ident (,) ... ; } { $rest ... } } => {
+        var id = unwrapSyntax(#{$id});
+        letstx $id2 = [makeValue(id + 1, #{$id})];
+        // Step the state number by 1 so we don't have to special case the state counter.
+        return #{
+            case $id2:
+            step_state $task $state_machine $id2 $dfvars { $rest ... }			
+        };
+    }	
+
 
     // ### Returning values from a task
     //
