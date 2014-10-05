@@ -355,8 +355,8 @@ need to be able to save and restore state variables. So keep track of that.</p>
     rule { $task $state_machine $fin $vars $dfvars { $body ... } { <span class="hljs-keyword">catch</span> ($e:ident) { $handler ... } $rest ... } } =&gt; {
         declare_state_variables $task $state_machine $fin $vars $dfvars { $body ... } { <span class="hljs-keyword">var</span> $e = <span class="hljs-literal">null</span> ; $handler ... $rest ... }
     }
-    rule { $task $state_machine $fin $vars $dfvars { $body ... } { <span class="hljs-keyword">switch</span> ($x ...) { $(<span class="hljs-keyword">case</span> $ix:lit (,) ... : { $body ... }) ... } $rest ... } } =&gt; {
-        declare_state_variables $task $state_machine $fin $vars $dfvars { $body ... } { $($body ...) ... $rest ... }
+    rule { $task $state_machine $fin $vars $dfvars { $bodypass ... } { <span class="hljs-keyword">switch</span> ($x ...) { $(<span class="hljs-keyword">case</span> $ix:lit (,) ... : { $body ... }) ... } $rest ... } } =&gt; {
+        declare_state_variables $task $state_machine $fin $vars $dfvars { $bodypass ... } { $($body ...) ... $rest ... }
     }
     rule { $task $state_machine $fin $vars $dfvars { $body ... } { $step ... ; $rest ... } } =&gt; {
         declare_state_variables_step $task $state_machine $fin $vars $dfvars { $body ... } { $step ... ; } { $rest ... }
@@ -479,10 +479,10 @@ to traditional javascript as possible.</p>
             <div class="content"><div class='highlight'><pre>
 macro step_state {
     rule { $task $state_machine $id $dfvars { <span class="hljs-keyword">if</span> ($x ...) { $then ... } <span class="hljs-keyword">else</span> { $<span class="hljs-keyword">else</span> ... } $rest ... } } =&gt; {
-        step_state_line_if_else $task $state_machine $id { <span class="hljs-keyword">if</span> ($x ...) { $then ... } <span class="hljs-keyword">else</span> { $<span class="hljs-keyword">else</span> ... } } { $rest ... }
+        step_state_line_if_else_with_ensure_dfv $task $state_machine $id $dfvars { <span class="hljs-keyword">if</span> ($x ...) { $then ... } <span class="hljs-keyword">else</span> { $<span class="hljs-keyword">else</span> ... } } { $rest ... }
     }
     rule { $task $state_machine $id $dfvars { <span class="hljs-keyword">if</span> ($x ...) { $then ... }  $rest ... } } =&gt; {
-        step_state_line_if $task $state_machine $id { <span class="hljs-keyword">if</span> ($x ...) { $then ... } } { $rest ... }
+        step_state_line_if_with_ensure_dfv $task $state_machine $id $dfvars { <span class="hljs-keyword">if</span> ($x ...) { $then ... } } { $rest ... }
     }</pre></div></div>
             
         </li>
@@ -499,22 +499,22 @@ macro step_state {
             </div>
             
             <div class="content"><div class='highlight'><pre>    rule { $task $state_machine $id $dfvars { <span class="hljs-keyword">for</span> ($init ... ; $cond ... ; $next ...) { $body ... }  $rest ... } } =&gt; {
-        step_state $task $state_machine $id { $init ... ; <span class="hljs-keyword">while</span> ($cond ...) { $body ... $next ... ; } $rest ... }
+        step_state $task $state_machine $id $dfvars { $init ... ; <span class="hljs-keyword">while</span> ($cond ...) { $body ... $next ... ; } $rest ... }
     }
     rule { $task $state_machine $id $dfvars { <span class="hljs-keyword">while</span> ($x ...) { $body ... }  $rest ... } } =&gt; {
-        step_state_line_while $task $state_machine $id { <span class="hljs-keyword">while</span> ($x ...) { $body ... } } { $rest ... }
+        step_state_line_while_with_ensure_dfv $task $state_machine $id $dfvars { <span class="hljs-keyword">while</span> ($x ...) { $body ... } } { $rest ... }
     }
     rule { $task $state_machine $id $dfvars { <span class="hljs-keyword">finally</span> { $cleanup ... }  $rest ... } } =&gt; {
-        step_state_line_finally_block $task $state_machine $id { <span class="hljs-keyword">finally</span> { $cleanup ... } } { $rest ... }
+        step_state_line_finally_block $task $state_machine $id $dfvars { <span class="hljs-keyword">finally</span> { $cleanup ... } } { $rest ... }
     }
     rule { $task $state_machine $id $dfvars { <span class="hljs-keyword">finally</span> $cleanup ... ($args:expr (,) ...) ;  $rest ... } } =&gt; {
-        step_state_line_finally_expr $task $state_machine $id { <span class="hljs-keyword">finally</span> $cleanup ... ($args (,) ...) ; } { $rest ... }
+        step_state_line_finally_expr_with_ensure_dfv $task $state_machine $id $dfvars { <span class="hljs-keyword">finally</span> $cleanup ... ($args (,) ...) ; } { $rest ... }
     }
     rule { $task $state_machine $id $dfvars { <span class="hljs-keyword">catch</span> ($x ...) { $handler ... }  $rest ... } } =&gt; {
-        step_state_line_catch $task $state_machine $id { <span class="hljs-keyword">catch</span> ($x ...) { $handler ... } } { $rest ... }
+        step_state_line_catch $task $state_machine $id $dfvars { <span class="hljs-keyword">catch</span> ($x ...) { $handler ... } } { $rest ... }
     }
     rule { $task $state_machine $id $dfvars { <span class="hljs-keyword">switch</span> ($x:expr) { $b ... } $rest ... } } =&gt; {
-        step_state_line_switch $task $state_machine $id { <span class="hljs-keyword">switch</span> ($x) { $b ... } } { $rest ... }
+        step_state_line_switch_with_ensure_dfv $task $state_machine $id $dfvars { <span class="hljs-keyword">switch</span> ($x) { $b ... } } { $rest ... }
     }
     rule { $task $state_machine $id $dfvars { $step ... ; $rest ... } } =&gt; {
         step_state_line_with_ensure_dfv $task $state_machine $id $dfvars { $step ... ; } { $rest ... }
@@ -651,7 +651,7 @@ async statements can also be used within them.</p>
             
             <div class="content"><div class='highlight'><pre>
 macro step_state_line_if_else {
-    <span class="hljs-keyword">case</span> { $me $task $state_machine $id { <span class="hljs-keyword">if</span> ($x:expr) { $then ... } <span class="hljs-keyword">else</span> { $<span class="hljs-keyword">else</span> ... } } { $rest ... } } =&gt; {
+    <span class="hljs-keyword">case</span> { $me $task $state_machine $id $dfvars { <span class="hljs-keyword">if</span> ($x:expr) { $then ... } <span class="hljs-keyword">else</span> { $<span class="hljs-keyword">else</span> ... } } { $rest ... } } =&gt; {
         <span class="hljs-keyword">var</span> id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + <span class="hljs-number">1</span>, #{$id})];
         <span class="hljs-keyword">return</span> #{
@@ -663,13 +663,21 @@ macro step_state_line_if_else {
                 <span class="hljs-keyword">break</span>;
             }
             <span class="hljs-keyword">case</span> $id2:
-            step_state $task $state_machine $id2 { $then ... phi $state_machine ; $<span class="hljs-keyword">else</span> ... phi $state_machine ; $rest ... }
+            step_state $task $state_machine $id2 $dfvars { $then ... phi $state_machine ; $<span class="hljs-keyword">else</span> ... phi $state_machine ; $rest ... }
         };
     }
 }
 
+macro step_state_line_if_else_with_ensure_dfv {
+    rule { $task $state_machine $id $dfvars { <span class="hljs-keyword">if</span> ($x ...) { $then ... } <span class="hljs-keyword">else</span> { $<span class="hljs-keyword">else</span> ... } } { $rest ... } } =&gt; {
+        ensure_dfv $state_machine $id $dfvars { $x ... } ;
+        step_state_line_if_else $task $state_machine $id $dfvars { <span class="hljs-keyword">if</span> ($x ...) { $then ... } <span class="hljs-keyword">else</span> { $<span class="hljs-keyword">else</span> ... } } { $rest ... }
+    }
+}
+
+
 macro step_state_line_if {
-    <span class="hljs-keyword">case</span> { $me $task $state_machine $id { <span class="hljs-keyword">if</span> ($x:expr) { $then ... } } { $rest ... } } =&gt; {
+    <span class="hljs-keyword">case</span> { $me $task $state_machine $id $dfvars { <span class="hljs-keyword">if</span> ($x:expr) { $then ... } } { $rest ... } } =&gt; {
         <span class="hljs-keyword">var</span> id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + <span class="hljs-number">1</span>, #{$id})];
         <span class="hljs-keyword">return</span> #{
@@ -681,8 +689,15 @@ macro step_state_line_if {
                 <span class="hljs-keyword">break</span>;
             }
             <span class="hljs-keyword">case</span> $id2:
-            step_state $task $state_machine $id2 { $then ... phi $state_machine; $rest ... }
+            step_state $task $state_machine $id2 $dfvars { $then ... phi $state_machine; $rest ... }
         };
+    }
+}
+
+macro step_state_line_if_with_ensure_dfv {
+    rule { $task $state_machine $id $dfvars { <span class="hljs-keyword">if</span> ($x:expr) { $then ... } } { $rest ... } } =&gt; {
+        ensure_dfv $state_machine $id $dfvars { $x } ;
+        step_state_line_if $task $state_machine $id $dfvars { <span class="hljs-keyword">if</span> ($x) { $then ... } } { $rest ... }
     }
 }
 
@@ -727,7 +742,7 @@ an unhandled case occurs at runtime.</p>
             </div>
             
             <div class="content"><div class='highlight'><pre>
-    <span class="hljs-keyword">case</span> { $me $task $state_machine $id { <span class="hljs-keyword">switch</span> ($c:expr) { $(<span class="hljs-keyword">case</span> $ix:lit (,) ... : { $body ... }) ... } } { $rest ... } } =&gt; {
+    <span class="hljs-keyword">case</span> { $me $task $state_machine $id $dfvars { <span class="hljs-keyword">switch</span> ($c:expr) { $(<span class="hljs-keyword">case</span> $ix:lit (,) ... : { $body ... }) ... } } { $rest ... } } =&gt; {
         <span class="hljs-keyword">var</span> id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + <span class="hljs-number">1</span>, #{$id})];
         <span class="hljs-keyword">return</span> #{
@@ -738,11 +753,18 @@ an unhandled case occurs at runtime.</p>
             tmp1.jumpToCase($state_machine, $c);
             <span class="hljs-keyword">break</span>;
             <span class="hljs-keyword">case</span> $id2:
-            step_state $task $state_machine $id2 {
+            step_state $task $state_machine $id2 $dfvars {
                 $($body ... phi $state_machine ;) ...
                     $rest ...
             }
         };
+    }
+}
+
+macro step_state_line_switch_with_ensure_dfv {
+    rule { $task $state_machine $id $dfvars { <span class="hljs-keyword">switch</span> ($c:expr) { $(<span class="hljs-keyword">case</span> $ix:lit (,) ... : { $body ... }) ... } } { $rest ... } } =&gt; {
+        ensure_dfv $state_machine $id $dfvars { $c } ;
+        step_state_line_switch $task $state_machine $id $dfvars { <span class="hljs-keyword">switch</span> ($c) { $(<span class="hljs-keyword">case</span> $ix (,) ... : { $body ... }) ... } } { $rest ... }
     }
 }</pre></div></div>
             
@@ -763,7 +785,7 @@ an unhandled case occurs at runtime.</p>
             
             <div class="content"><div class='highlight'><pre>
 macro step_state_line_while {
-    <span class="hljs-keyword">case</span> { $me $task $state_machine $id { <span class="hljs-keyword">while</span> ($x:expr) { $body ... } } { $rest ... } } =&gt; {
+    <span class="hljs-keyword">case</span> { $me $task $state_machine $id $dfvars { <span class="hljs-keyword">while</span> ($x:expr) { $body ... } } { $rest ... } } =&gt; {
         <span class="hljs-keyword">var</span> id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + <span class="hljs-number">1</span>, #{$id})];
         <span class="hljs-keyword">return</span> #{
@@ -778,6 +800,14 @@ macro step_state_line_while {
             step_state $task $state_machine $id2 { $body ... phi $state_machine ; $rest ... }
         };
     }                                                    
+}
+
+
+macro step_state_line_while_with_ensure_dfv {
+    rule { $task $state_machine $id $dfvars { <span class="hljs-keyword">while</span> ($x:expr) { $body ... } } { $rest ... } } =&gt; {
+        ensure_dfv $state_machine $id $dfvars {$x} ;
+        step_state_line_while $task $state_machine $id $dfvars { <span class="hljs-keyword">while</span> ($x) { $body ... } } { $rest ... }
+    }
 }</pre></div></div>
             
         </li>
@@ -823,7 +853,7 @@ when the <code>finally</code> statement is encountered, but the call itself is p
             
             <div class="content"><div class='highlight'><pre>
 macro step_state_line_finally_expr {
-    <span class="hljs-keyword">case</span> { $me $task $state_machine $id { <span class="hljs-keyword">finally</span> $cleanup ... . $methId:ident ($arg:expr (,) ...) ; } { $rest ... } } =&gt; {
+    <span class="hljs-keyword">case</span> { $me $task $state_machine $id $dfvars { <span class="hljs-keyword">finally</span> $cleanup ... . $methId:ident ($arg:expr (,) ...) ; } { $rest ... } } =&gt; {
         <span class="hljs-keyword">var</span> id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + <span class="hljs-number">1</span>, #{$id})];
         <span class="hljs-comment">/* Evaluate the arguments right now, but call the cleanup function later. */</span>
@@ -831,10 +861,10 @@ macro step_state_line_finally_expr {
             <span class="hljs-keyword">var</span> tmp1 = $cleanup ... ;
             $state_machine.pushCleanupAction(tmp1, tmp1.$methId, [$arg (,) ...]);
             <span class="hljs-keyword">case</span> $id2:
-            step_state $task $state_machine $id2 { $rest ... }
+            step_state $task $state_machine $id2 $dfvars { $rest ... }
         };
     }
-    <span class="hljs-keyword">case</span> { $me $task $state_machine $id { <span class="hljs-keyword">finally</span> $cleanup ... [ $methExpr:expr ] ($arg:expr (,) ...) ; } { $rest ... } } =&gt; {
+    <span class="hljs-keyword">case</span> { $me $task $state_machine $id $dfvars { <span class="hljs-keyword">finally</span> $cleanup ... [ $methExpr:expr ] ($arg:expr (,) ...) ; } { $rest ... } } =&gt; {
         <span class="hljs-keyword">var</span> id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + <span class="hljs-number">1</span>, #{$id})];
         <span class="hljs-comment">/* Evaluate the arguments right now, but call the cleanup function later. */</span>
@@ -842,19 +872,35 @@ macro step_state_line_finally_expr {
             <span class="hljs-keyword">var</span> tmp1 = $cleanup ... ;
             $state_machine.pushCleanupAction(tmp1, tmp1[$methExpr], [$arg (,) ...]);
             <span class="hljs-keyword">case</span> $id2:
-            step_state $task $state_machine $id2 { $rest ... }
+            step_state $task $state_machine $id2 $dfvars { $rest ... }
         };
     }
-    <span class="hljs-keyword">case</span> { $me $task $state_machine $id { <span class="hljs-keyword">finally</span> $cleanup ... ($arg:expr (,) ...) ; } { $rest ... } } =&gt; {
+    <span class="hljs-keyword">case</span> { $me $task $state_machine $id $dfvars { <span class="hljs-keyword">finally</span> $cleanup ... ($arg:expr (,) ...) ; } { $rest ... } } =&gt; {
         <span class="hljs-keyword">var</span> id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + <span class="hljs-number">1</span>, #{$id})];
         <span class="hljs-comment">/* Evaluate the arguments right now, but call the cleanup function later. */</span>
         <span class="hljs-keyword">return</span> #{
             $state_machine.pushCleanupAction(<span class="hljs-keyword">this</span>, $cleanup ... , [$arg (,) ...]);
             <span class="hljs-keyword">case</span> $id2:
-            step_state $task $state_machine $id2 { $rest ... }
+            step_state $task $state_machine $id2 $dfvars { $rest ... }
         };
     }
+}
+
+
+macro step_state_line_finally_expr_with_ensure_dfv {
+    rule { $task $state_machine $id $dfvars { <span class="hljs-keyword">finally</span> $cleanup ... . $methId:ident ($arg:expr (,) ...) ; } { $rest ... } } =&gt; {
+        ensure_dfv $state_machine $id $dfvars { ($cleanup ..., $arg (,) ...) } ;
+        step_state_line_finally_expr $task $state_machine $id $dfvars { <span class="hljs-keyword">finally</span> $cleanup ... . $methId ($arg (,) ...) ; } { $rest ... }
+    }
+    rule { $task $state_machine $id $dfvars { <span class="hljs-keyword">finally</span> $cleanup ... [ $methExpr:expr ] ($arg:expr (,) ...) ; } { $rest ... } } =&gt; {
+        ensure_dfv $state_machine $id $dfvars { ($cleanup ..., $methExpr, $arg (,) ...) } ;
+        step_state_line_finally_expr $task $state_machine $id $dfvars { <span class="hljs-keyword">finally</span> $cleanup ... [ $methExpr ] ($arg (,) ...) ; } { $rest ... }
+    }
+    rule { $task $state_machine $id $dfvars { <span class="hljs-keyword">finally</span> $cleanup ... ($arg:expr (,) ...) ; } { $rest ... } } =&gt; {
+        ensure_dfv $state_machine $id $dfvars { ($cleanup ..., $arg (,) ...) } ;
+        step_state_line_finally_expr $task $state_machine $id $dfvars { <span class="hljs-keyword">finally</span> $cleanup ... ($arg (,) ...) ; } { $rest ... }
+    }    
 }</pre></div></div>
             
         </li>
@@ -872,7 +918,7 @@ macro step_state_line_finally_expr {
             
             <div class="content"><div class='highlight'><pre>
 macro step_state_line_finally_block {
-    <span class="hljs-keyword">case</span> { $me $task $state_machine $id { <span class="hljs-keyword">finally</span> { $cleanup ... } } { $rest ... } } =&gt; {
+    <span class="hljs-keyword">case</span> { $me $task $state_machine $id $dfvars { <span class="hljs-keyword">finally</span> { $cleanup ... } } { $rest ... } } =&gt; {
         <span class="hljs-keyword">var</span> id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + <span class="hljs-number">1</span>, #{$id})];
         <span class="hljs-keyword">return</span> #{
@@ -880,7 +926,7 @@ macro step_state_line_finally_block {
             $state_machine.pushCleanupStep($id2, $id2 + <span class="hljs-number">1</span> + jumpHandler);
             <span class="hljs-keyword">break</span>;
             <span class="hljs-keyword">case</span> $id2:
-            step_state $task $state_machine $id2 { $cleanup ... phi $state_machine ; $rest ... }
+            step_state $task $state_machine $id2 $dfvars { $cleanup ... phi $state_machine ; $rest ... }
         };
     }
 }</pre></div></div>
@@ -905,7 +951,7 @@ clauses above.</p>
             
             <div class="content"><div class='highlight'><pre>
 macro step_state_line_catch {
-    <span class="hljs-keyword">case</span> { $me $task $state_machine $id { <span class="hljs-keyword">catch</span> ($eclass:ident $e:ident) { $handler ... } } { $rest ... } } =&gt; {
+    <span class="hljs-keyword">case</span> { $me $task $state_machine $id $dfvars { <span class="hljs-keyword">catch</span> ($eclass:ident $e:ident) { $handler ... } } { $rest ... } } =&gt; {
         <span class="hljs-keyword">var</span> id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + <span class="hljs-number">1</span>, #{$id})];
         <span class="hljs-keyword">return</span> #{
@@ -918,11 +964,11 @@ macro step_state_line_catch {
                 $state_machine.phi();
                 <span class="hljs-keyword">break</span>;
             }
-            step_state $task $state_machine $id2 { $handler ... phi $state_machine ; $rest ... }
+            step_state $task $state_machine $id2 $dfvars { $handler ... phi $state_machine ; $rest ... }
         };
     }
 
-    <span class="hljs-keyword">case</span> { $me $task $state_machine $id { <span class="hljs-keyword">catch</span> ($e:ident) { $handler ... } } { $rest ... } } =&gt; {
+    <span class="hljs-keyword">case</span> { $me $task $state_machine $id $dfvars { <span class="hljs-keyword">catch</span> ($e:ident) { $handler ... } } { $rest ... } } =&gt; {
         <span class="hljs-keyword">var</span> id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + <span class="hljs-number">1</span>, #{$id})];
         <span class="hljs-keyword">return</span> #{
@@ -931,7 +977,7 @@ macro step_state_line_catch {
             <span class="hljs-keyword">break</span>;
             <span class="hljs-keyword">case</span> $id2:
             $e = $state_machine.state.err;
-            step_state $task $state_machine $id2 { $handler ... phi $state_machine ; $rest ... }
+            step_state $task $state_machine $id2 $dfvars { $handler ... phi $state_machine ; $rest ... }
         };
     }
 }</pre></div></div>

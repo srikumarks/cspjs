@@ -222,8 +222,8 @@ macro declare_state_variables {
     rule { $task $state_machine $fin $vars $dfvars { $body ... } { catch ($e:ident) { $handler ... } $rest ... } } => {
         declare_state_variables $task $state_machine $fin $vars $dfvars { $body ... } { var $e = null ; $handler ... $rest ... }
     }
-    rule { $task $state_machine $fin $vars $dfvars { $body ... } { switch ($x ...) { $(case $ix:lit (,) ... : { $body ... }) ... } $rest ... } } => {
-        declare_state_variables $task $state_machine $fin $vars $dfvars { $body ... } { $($body ...) ... $rest ... }
+    rule { $task $state_machine $fin $vars $dfvars { $bodypass ... } { switch ($x ...) { $(case $ix:lit (,) ... : { $body ... }) ... } $rest ... } } => {
+        declare_state_variables $task $state_machine $fin $vars $dfvars { $bodypass ... } { $($body ...) ... $rest ... }
     }
     rule { $task $state_machine $fin $vars $dfvars { $body ... } { $step ... ; $rest ... } } => {
         declare_state_variables_step $task $state_machine $fin $vars $dfvars { $body ... } { $step ... ; } { $rest ... }
@@ -324,29 +324,29 @@ macro declare_state_arguments {
 
 macro step_state {
     rule { $task $state_machine $id $dfvars { if ($x ...) { $then ... } else { $else ... } $rest ... } } => {
-        step_state_line_if_else $task $state_machine $id { if ($x ...) { $then ... } else { $else ... } } { $rest ... }
+        step_state_line_if_else_with_ensure_dfv $task $state_machine $id $dfvars { if ($x ...) { $then ... } else { $else ... } } { $rest ... }
     }
     rule { $task $state_machine $id $dfvars { if ($x ...) { $then ... }  $rest ... } } => {
-        step_state_line_if $task $state_machine $id { if ($x ...) { $then ... } } { $rest ... }
+        step_state_line_if_with_ensure_dfv $task $state_machine $id $dfvars { if ($x ...) { $then ... } } { $rest ... }
     }
     // Rewrite for loops using while.
     rule { $task $state_machine $id $dfvars { for ($init ... ; $cond ... ; $next ...) { $body ... }  $rest ... } } => {
-        step_state $task $state_machine $id { $init ... ; while ($cond ...) { $body ... $next ... ; } $rest ... }
+        step_state $task $state_machine $id $dfvars { $init ... ; while ($cond ...) { $body ... $next ... ; } $rest ... }
     }
     rule { $task $state_machine $id $dfvars { while ($x ...) { $body ... }  $rest ... } } => {
-        step_state_line_while $task $state_machine $id { while ($x ...) { $body ... } } { $rest ... }
+        step_state_line_while_with_ensure_dfv $task $state_machine $id $dfvars { while ($x ...) { $body ... } } { $rest ... }
     }
     rule { $task $state_machine $id $dfvars { finally { $cleanup ... }  $rest ... } } => {
-        step_state_line_finally_block $task $state_machine $id { finally { $cleanup ... } } { $rest ... }
+        step_state_line_finally_block $task $state_machine $id $dfvars { finally { $cleanup ... } } { $rest ... }
     }
     rule { $task $state_machine $id $dfvars { finally $cleanup ... ($args:expr (,) ...) ;  $rest ... } } => {
-        step_state_line_finally_expr $task $state_machine $id { finally $cleanup ... ($args (,) ...) ; } { $rest ... }
+        step_state_line_finally_expr_with_ensure_dfv $task $state_machine $id $dfvars { finally $cleanup ... ($args (,) ...) ; } { $rest ... }
     }
     rule { $task $state_machine $id $dfvars { catch ($x ...) { $handler ... }  $rest ... } } => {
-        step_state_line_catch $task $state_machine $id { catch ($x ...) { $handler ... } } { $rest ... }
+        step_state_line_catch $task $state_machine $id $dfvars { catch ($x ...) { $handler ... } } { $rest ... }
     }
     rule { $task $state_machine $id $dfvars { switch ($x:expr) { $b ... } $rest ... } } => {
-        step_state_line_switch $task $state_machine $id { switch ($x) { $b ... } } { $rest ... }
+        step_state_line_switch_with_ensure_dfv $task $state_machine $id $dfvars { switch ($x) { $b ... } } { $rest ... }
     }
     rule { $task $state_machine $id $dfvars { $step ... ; $rest ... } } => {
         step_state_line_with_ensure_dfv $task $state_machine $id $dfvars { $step ... ; } { $rest ... }
@@ -437,7 +437,7 @@ macro sumup_counts {
 // async statements can also be used within them.
 
 macro step_state_line_if_else {
-    case { $me $task $state_machine $id { if ($x:expr) { $then ... } else { $else ... } } { $rest ... } } => {
+    case { $me $task $state_machine $id $dfvars { if ($x:expr) { $then ... } else { $else ... } } { $rest ... } } => {
         var id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + 1, #{$id})];
         return #{
@@ -449,13 +449,21 @@ macro step_state_line_if_else {
                 break;
             }
             case $id2:
-            step_state $task $state_machine $id2 { $then ... phi $state_machine ; $else ... phi $state_machine ; $rest ... }
+            step_state $task $state_machine $id2 $dfvars { $then ... phi $state_machine ; $else ... phi $state_machine ; $rest ... }
         };
     }
 }
 
+macro step_state_line_if_else_with_ensure_dfv {
+    rule { $task $state_machine $id $dfvars { if ($x ...) { $then ... } else { $else ... } } { $rest ... } } => {
+        ensure_dfv $state_machine $id $dfvars { $x ... } ;
+        step_state_line_if_else $task $state_machine $id $dfvars { if ($x ...) { $then ... } else { $else ... } } { $rest ... }
+    }
+}
+
+
 macro step_state_line_if {
-    case { $me $task $state_machine $id { if ($x:expr) { $then ... } } { $rest ... } } => {
+    case { $me $task $state_machine $id $dfvars { if ($x:expr) { $then ... } } { $rest ... } } => {
         var id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + 1, #{$id})];
         return #{
@@ -467,8 +475,15 @@ macro step_state_line_if {
                 break;
             }
             case $id2:
-            step_state $task $state_machine $id2 { $then ... phi $state_machine; $rest ... }
+            step_state $task $state_machine $id2 $dfvars { $then ... phi $state_machine; $rest ... }
         };
+    }
+}
+
+macro step_state_line_if_with_ensure_dfv {
+    rule { $task $state_machine $id $dfvars { if ($x:expr) { $then ... } } { $rest ... } } => {
+        ensure_dfv $state_machine $id $dfvars { $x } ;
+        step_state_line_if $task $state_machine $id $dfvars { if ($x) { $then ... } } { $rest ... }
     }
 }
 
@@ -505,7 +520,7 @@ macro step_state_line_switch {
     // that `break;` statements are not needed, and an exception is raised if
     // an unhandled case occurs at runtime.
 
-    case { $me $task $state_machine $id { switch ($c:expr) { $(case $ix:lit (,) ... : { $body ... }) ... } } { $rest ... } } => {
+    case { $me $task $state_machine $id $dfvars { switch ($c:expr) { $(case $ix:lit (,) ... : { $body ... }) ... } } { $rest ... } } => {
         var id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + 1, #{$id})];
         return #{
@@ -516,7 +531,7 @@ macro step_state_line_switch {
             tmp1.jumpToCase($state_machine, $c);
             break;
             case $id2:
-            step_state $task $state_machine $id2 {
+            step_state $task $state_machine $id2 $dfvars {
                 $($body ... phi $state_machine ;) ...
                     $rest ...
             }
@@ -524,13 +539,21 @@ macro step_state_line_switch {
     }
 }
 
+macro step_state_line_switch_with_ensure_dfv {
+    rule { $task $state_machine $id $dfvars { switch ($c:expr) { $(case $ix:lit (,) ... : { $body ... }) ... } } { $rest ... } } => {
+        ensure_dfv $state_machine $id $dfvars { $c } ;
+        step_state_line_switch $task $state_machine $id $dfvars { switch ($c) { $(case $ix (,) ... : { $body ... }) ... } } { $rest ... }
+    }
+}
+
+
 // ### Looping using `while`
 //
 // The usual `while (cond) { body... }` is supported as well, except that there is no
 // `break;' statement support.
 
 macro step_state_line_while {
-    case { $me $task $state_machine $id { while ($x:expr) { $body ... } } { $rest ... } } => {
+    case { $me $task $state_machine $id $dfvars { while ($x:expr) { $body ... } } { $rest ... } } => {
         var id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + 1, #{$id})];
         return #{
@@ -546,6 +569,15 @@ macro step_state_line_while {
         };
     }                                                    
 }
+
+
+macro step_state_line_while_with_ensure_dfv {
+    rule { $task $state_machine $id $dfvars { while ($x:expr) { $body ... } } { $rest ... } } => {
+        ensure_dfv $state_machine $id $dfvars {$x} ;
+        step_state_line_while $task $state_machine $id $dfvars { while ($x) { $body ... } } { $rest ... }
+    }
+}
+
 
 // ### Exception mechanism
 //
@@ -570,7 +602,7 @@ macro step_state_line_while {
 // (obviously).
 
 macro step_state_line_finally_expr {
-    case { $me $task $state_machine $id { finally $cleanup ... . $methId:ident ($arg:expr (,) ...) ; } { $rest ... } } => {
+    case { $me $task $state_machine $id $dfvars { finally $cleanup ... . $methId:ident ($arg:expr (,) ...) ; } { $rest ... } } => {
         var id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + 1, #{$id})];
         /* Evaluate the arguments right now, but call the cleanup function later. */
@@ -578,10 +610,10 @@ macro step_state_line_finally_expr {
             var tmp1 = $cleanup ... ;
             $state_machine.pushCleanupAction(tmp1, tmp1.$methId, [$arg (,) ...]);
             case $id2:
-            step_state $task $state_machine $id2 { $rest ... }
+            step_state $task $state_machine $id2 $dfvars { $rest ... }
         };
     }
-    case { $me $task $state_machine $id { finally $cleanup ... [ $methExpr:expr ] ($arg:expr (,) ...) ; } { $rest ... } } => {
+    case { $me $task $state_machine $id $dfvars { finally $cleanup ... [ $methExpr:expr ] ($arg:expr (,) ...) ; } { $rest ... } } => {
         var id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + 1, #{$id})];
         /* Evaluate the arguments right now, but call the cleanup function later. */
@@ -589,25 +621,42 @@ macro step_state_line_finally_expr {
             var tmp1 = $cleanup ... ;
             $state_machine.pushCleanupAction(tmp1, tmp1[$methExpr], [$arg (,) ...]);
             case $id2:
-            step_state $task $state_machine $id2 { $rest ... }
+            step_state $task $state_machine $id2 $dfvars { $rest ... }
         };
     }
-    case { $me $task $state_machine $id { finally $cleanup ... ($arg:expr (,) ...) ; } { $rest ... } } => {
+    case { $me $task $state_machine $id $dfvars { finally $cleanup ... ($arg:expr (,) ...) ; } { $rest ... } } => {
         var id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + 1, #{$id})];
         /* Evaluate the arguments right now, but call the cleanup function later. */
         return #{
             $state_machine.pushCleanupAction(this, $cleanup ... , [$arg (,) ...]);
             case $id2:
-            step_state $task $state_machine $id2 { $rest ... }
+            step_state $task $state_machine $id2 $dfvars { $rest ... }
         };
     }
 }
 
+
+macro step_state_line_finally_expr_with_ensure_dfv {
+    rule { $task $state_machine $id $dfvars { finally $cleanup ... . $methId:ident ($arg:expr (,) ...) ; } { $rest ... } } => {
+        ensure_dfv $state_machine $id $dfvars { ($cleanup ..., $arg (,) ...) } ;
+        step_state_line_finally_expr $task $state_machine $id $dfvars { finally $cleanup ... . $methId ($arg (,) ...) ; } { $rest ... }
+    }
+    rule { $task $state_machine $id $dfvars { finally $cleanup ... [ $methExpr:expr ] ($arg:expr (,) ...) ; } { $rest ... } } => {
+        ensure_dfv $state_machine $id $dfvars { ($cleanup ..., $methExpr, $arg (,) ...) } ;
+        step_state_line_finally_expr $task $state_machine $id $dfvars { finally $cleanup ... [ $methExpr ] ($arg (,) ...) ; } { $rest ... }
+    }
+    rule { $task $state_machine $id $dfvars { finally $cleanup ... ($arg:expr (,) ...) ; } { $rest ... } } => {
+        ensure_dfv $state_machine $id $dfvars { ($cleanup ..., $arg (,) ...) } ;
+        step_state_line_finally_expr $task $state_machine $id $dfvars { finally $cleanup ... ($arg (,) ...) ; } { $rest ... }
+    }    
+}
+
+
 // `finally { ... }` mark blocks of steps to be run at unwinding time.
 
 macro step_state_line_finally_block {
-    case { $me $task $state_machine $id { finally { $cleanup ... } } { $rest ... } } => {
+    case { $me $task $state_machine $id $dfvars { finally { $cleanup ... } } { $rest ... } } => {
         var id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + 1, #{$id})];
         return #{
@@ -615,7 +664,7 @@ macro step_state_line_finally_block {
             $state_machine.pushCleanupStep($id2, $id2 + 1 + jumpHandler);
             break;
             case $id2:
-            step_state $task $state_machine $id2 { $cleanup ... phi $state_machine ; $rest ... }
+            step_state $task $state_machine $id2 $dfvars { $cleanup ... phi $state_machine ; $rest ... }
         };
     }
 }
@@ -629,7 +678,7 @@ macro step_state_line_finally_block {
 // clauses above.
 
 macro step_state_line_catch {
-    case { $me $task $state_machine $id { catch ($eclass:ident $e:ident) { $handler ... } } { $rest ... } } => {
+    case { $me $task $state_machine $id $dfvars { catch ($eclass:ident $e:ident) { $handler ... } } { $rest ... } } => {
         var id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + 1, #{$id})];
         return #{
@@ -642,11 +691,11 @@ macro step_state_line_catch {
                 $state_machine.phi();
                 break;
             }
-            step_state $task $state_machine $id2 { $handler ... phi $state_machine ; $rest ... }
+            step_state $task $state_machine $id2 $dfvars { $handler ... phi $state_machine ; $rest ... }
         };
     }
 
-    case { $me $task $state_machine $id { catch ($e:ident) { $handler ... } } { $rest ... } } => {
+    case { $me $task $state_machine $id $dfvars { catch ($e:ident) { $handler ... } } { $rest ... } } => {
         var id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + 1, #{$id})];
         return #{
@@ -655,7 +704,7 @@ macro step_state_line_catch {
             break;
             case $id2:
             $e = $state_machine.state.err;
-            step_state $task $state_machine $id2 { $handler ... phi $state_machine ; $rest ... }
+            step_state $task $state_machine $id2 $dfvars { $handler ... phi $state_machine ; $rest ... }
         };
     }
 }
