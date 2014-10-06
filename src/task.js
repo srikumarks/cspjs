@@ -792,8 +792,7 @@ macro step_state_line_with_ensure_dfv {
     }
 
     rule { $task $state_machine $id $dfvars { await $y ... ($args:expr (,) ...); } { $rest ... } } => {
-        ensure_dfv $state_machine $id $dfvars { $y ... } ;
-        ensure_dfv $state_machine $id $dfvars { ($args (,) ...) } ;
+        ensure_dfv $state_machine $id $dfvars { $y ... ($args (,) ...) } ;
         step_state_line $task $state_machine $id $dfvars { await $y ... ($args (,) ...); } { $rest ... }
     }
 
@@ -808,8 +807,7 @@ macro step_state_line_with_ensure_dfv {
     }
 
     rule { $task $state_machine $id $dfvars { $x:ident (,) ... <- $y ... ($args:expr (,) ...); } { $rest ... } } => {
-        ensure_dfv $state_machine $id $dfvars { $y ... } ;
-        ensure_dfv $state_machine $id $dfvars { ($args (,) ...) } ;
+        ensure_dfv $state_machine $id $dfvars { $y ... ($args (,) ...) } ;
         step_state_line $task $state_machine $id $dfvars { $x (,) ... <- $y ... ($args (,) ...); } { $rest ... }
     }
 

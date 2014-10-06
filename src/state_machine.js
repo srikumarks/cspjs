@@ -320,12 +320,26 @@ StateMachine.prototype.dfvar = function (v, binder) {
     return dfv;
 };
 
+function duplicateBindingErr(dfv, val) {
+    var e = new Error("Duplicate data flow binding");
+    e.dataFlowVar = dfv;
+    e.newBinding = val;
+    return e;
+}
+
 // Binds the given data flow variable "dfv" to the given value "val".
 // The value can itself be a dfv or a thenable, in which case the outcome
 // of "dfv" is bound to the outcome of "val".
+//
+// You cannot bind a data flow variable twice. A duplicate binding
+// error will be thrown if that happens. The fields "dataFlowVar"
+// and "newBinding" of the error object contain the context.
 StateMachine.prototype.dfbind = function (dfv, val) {
     var sm = this;
     if (dfv && dfv.constructor === DataFlowVar) {
+        if (dfv.promise.isResolved()) {
+            throw duplicateBindingErr(dfv, val);
+        }
         if (val && val.then) {
             // If val is a "thenable", then bind it to the dfv
             val.then(dfv.resolve, dfv.reject);
