@@ -285,12 +285,24 @@ function DataFlowVar() {
     self.promise = null;
     self.resolve = null;
     self.reject = null;
-    
+}
+
+DataFlowVar.prototype.init = function () {
+    var self = this;
     self.promise = new StateMachine.Promise(function (resolve, reject) {
         self.resolve = resolve;
         self.reject = reject;
     });
-}
+    return self;
+};
+
+DataFlowVar.prototype.initWithDFV = function (dfv, binder) {
+    var self = this;
+    self.promise = dfv.promise.then(binder);
+    self.resolve = dfv.resolve;
+    self.reject = dfv.reject;
+    return self;
+};
 
 // Makes a new dataflow variable.
 StateMachine.prototype.dfvar = function (v, binder) {
@@ -299,12 +311,11 @@ StateMachine.prototype.dfvar = function (v, binder) {
     // data flow variable. In this case, we simply 
     // use the same dfv.
     if (v && v.constructor === DataFlowVar) {
-        v.promise.then(binder);
-        return v;
+        return new DataFlowVar().initWithDFV(v, binder);
     }
 
     // For all other cases, we require a new dfv.
-    var dfv = new DataFlowVar();
+    var dfv = new DataFlowVar().init();
 
     // v is allowed to be a promise-like object - i.e. a "thenable", 
     // in which case we bind it to the dfv's resolver and rejecter.
