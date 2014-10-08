@@ -364,22 +364,51 @@ StateMachine.prototype.isDataFlowVar = function (x) {
 };
 
 StateMachine.prototype.ensure = function (id) {
-    var sm = this, f = null;
-    for (var i = 1; i < arguments.length; ++i) {
-        var a = arguments[i];
-        if (a && a.constructor === DataFlowVar) {
-            f = sm.thenTo(id);
-            // A regular nodejs callback (err, value) can be
-            // used as a rejector since the error is the first argument.
-            // Note that we're waiting for these variables to resolve
-            // one by one. This allows for the possibility that
-            // multiple ones may resolve at a time, resulting 
-            // in fewer wait cycles.
-            a.promise.then(function (val) { f(null); }, f);
-            return false;
-        }
-    } 
+    return this.ensureAll(Array.prototype.slice.call(arguments, 1), this.thenTo(id));
+}
+
+StateMachine.prototype.ensureOne = function (a, callback) {
+    if (a && a.constructor === DataFlowVar) {
+        a.promise.then(function (val) { callback(null, val); }, callback);
+        return false;
+    }
+    if (a && a.constructor === Array) {
+        return this.ensureAll(a, callback);
+    }
+    if (a && a.constructor === Object) {
+        return this.ensureAllKeys(a, callback);
+    }
     return true;
+};
+
+StateMachine.prototype.ensureAll = function (arr, callback) {
+    var i = 0, sm = this;
+    var next = function (err) {
+        if (err) { return callback(err); }
+        while (i < arr.length) {
+            if (!sm.ensureOne(arr[i++], next)) {
+                return false;
+            }
+        }
+        callback(null, arr);
+        return true;
+    };
+    return next(null);
+};
+
+StateMachine.prototype.ensureAllKeys = function (obj, callback) {
+    var i = 0, sm = this, keys = Object.keys(obj);
+    var next = function (err) {
+        if (err) { return callback(err); }
+        while (i < keys.length) {
+            if (!sm.ensureOne(obj[keys[i++]], next)) {
+                return false;
+            }
+        }
+        callback(null, obj);
+        return true;
+    };
+    return next(null);
 };
 
 module.exports = StateMachine;

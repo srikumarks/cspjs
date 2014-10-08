@@ -229,7 +229,7 @@ macro declare_state_variables {
         declare_state_variables_step $task $state_machine $fin $vars $dfvars { $bodypass ... } { $step ... ; } { $rest ... }
     }
     rule { $task $state_machine $fin $vars $dfvars { $bodypass ... } { } } => { 
-        declare_unique_varset $task $state_machine $fin $vars $dfvars { $bodypass ... } 
+        declare_unique_varset $task $state_machine $fin $vars $dfvars $dfvars { $bodypass ... } 
     }
     rule { $task $state_machine $fin () () { $bodypass ... } { } } => { 
     }
@@ -240,20 +240,33 @@ macro declare_state_variables {
 // we don't want to pollute the generated code with repeated var declarations
 // as much as we can.
 
+macro dfvar_decl_strip {
+    rule { $x:ident[] } => { $x }
+    rule { $x:ident } => { $x }
+}
+
 macro declare_unique_varset {
-	case { _ $task $state_machine $fin ($v ...) ($u ...) { $body ... } } => {
+	case { _ $task $state_machine $fin ($v ...) ($u:dfvar_decl ...) ($us:dfvar_decl_strip ...) { $body ... } } => {
 		var vars = #{$v ... $u ...};
-		var varnames = vars.map(unwrapSyntax), pvarnames = (#{$u ...}).map(unwrapSyntax);
-		var uniqvarnames = {}, uniqpvarnames = {};
+		var varnames = vars.map(unwrapSyntax), pvarnames = (#{$us ...}).map(unwrapSyntax), pvardecls = (#{$u ...}).map(unwrapSyntax);
+		var uniqvarnames = {}, uniqpvarnames = {}, uniqpvardecls = {};
 		varnames.forEach(function (v) { uniqvarnames['%' + v] = true; });
-		pvarnames.forEach(function (v) { uniqpvarnames['%' + v] = true; });
-		letstx $uvars ... = Object.keys(uniqvarnames).map(function (v) { return makeIdent(v.substring(1), #{$task}); });
-		letstx $upvars ... = Object.keys(uniqpvarnames).map(function (v) { return makeIdent(v.substring(1), #{$task}); });
+		pvarnames.forEach(function (v) { uniqpvarnames['%' + v] = true; }); // With "x[]" forms stripped of the "[]".
+        pvardecls.forEach(function (v) { uniqpvardecls['%' + v] = true; });
+		letstx $uvvars ... = Object.keys(uniqvarnames).map(function (v) { return makeIdent(v.substring(1), #{$task}); });
+		letstx $uusvars ... = Object.keys(uniqpvarnames).map(function (v) { return makeIdent(v.substring(1), #{$task}); });
+		letstx $uuvars ... = Object.keys(uniqpvardecls).map(function (v) { 
+            try {
+                return makeIdent(v.substring(1), #{$task});
+            } catch (e) {
+                return null;
+            }
+        }).filter(function (x) { return x !== null; });
         letstx $state_machine_fn = [makeIdent("state_machine_fn", #{$task})];
 		return #{ 
-            declare_varset $task $state_machine $fin ($uvars ...) ;
-            declare_pvarset $task $state_machine ($upvars ...) ;
-            post_declare $task $state_machine $state_machine_fn ($upvars ...) { $body ... }
+            declare_varset $task $state_machine $fin ($uvvars ...) ;
+            declare_pvarset $task $state_machine ($uuvars ...) ;
+            post_declare $task $state_machine $state_machine_fn ($uusvars ...) { $body ... }
         };
 	}
 }
@@ -285,6 +298,11 @@ macro declare_pvarset {
     }
 }
 
+macro dfvar_decl {
+    rule { $x:ident[] } => { $x[] }
+    rule { $x:ident } => { $x }
+}
+
 macro declare_state_variables_step {
 	rule { $task $state_machine $fin ($v ...) ($u ...) { $bodypass ... } { $x:ident <- $y ... ; } { $rest ... } } => {
 		declare_state_variables $task $state_machine $fin ($x $v ...) ($u ...) { $bodypass ... } { $rest ... }
@@ -294,6 +312,9 @@ macro declare_state_variables_step {
 	}
 	rule { $task $state_machine $fin $vs ($u ...) { $bodypass ... } { $x:ident := $y ... ; } { $rest ... } } => {
 		declare_state_variables $task $state_machine $fin $vs ($x $u ...) { $bodypass ... } { $rest ... }
+	}
+	rule { $task $state_machine $fin $vs ($u ...) { $bodypass ... } { $x:ident[$xi:expr] := $y ... ; } { $rest ... } } => {
+		declare_state_variables $task $state_machine $fin $vs ($x[] $u ...) { $bodypass ... } { $rest ... }
 	}
 	rule { $task $state_machine $fin ($v ...) $us { $bodypass ... } { var $($x:ident = $y:expr) (,) ... ; } { $rest ... } } => {
 		declare_state_variables $task $state_machine $fin ($x ... $v ...) $us { $bodypass ... } { $rest ... }
@@ -421,6 +442,9 @@ macro count_states_line {
         count_states $task (2 $n ...) { $rest ... }
     }
     rule { $task ($n ...) { $x:ident := $y:expr ; } { $rest ... } } => {
+        count_states $task (1 $n ...) { $rest ... }
+    }
+    rule { $task ($n ...) { $x:ident[$xi:expr] := $y:expr ; } { $rest ... } } => {
         count_states $task (1 $n ...) { $rest ... }
     }
     rule { $task ($n ...) { $step ... ; } { $rest ... } } => {
@@ -785,6 +809,7 @@ macro ensure_dfv {
         return #{};
     }
 }
+
 macro step_state_line_with_ensure_dfv {
     rule { $task $state_machine $id $dfvars { await $y ... (); } { $rest ... } } => {
         ensure_dfv $state_machine $id $dfvars { $y ... } ;
@@ -823,6 +848,11 @@ macro step_state_line_with_ensure_dfv {
     rule { $task $state_machine $id $dfvars { $x:ident := $y:expr; } { $rest ... } } => {
         ensure_dfv $state_machine $id $dfvars { $y } ;
         step_state_line $task $state_machine $id $dfvars { $x := $y; } { $rest ... }
+    }
+
+    rule { $task $state_machine $id $dfvars { $x:ident[$i:expr] := $y:expr; } { $rest ... } } => {
+        ensure_dfv $state_machine $id $dfvars { $y } ;
+        step_state_line $task $state_machine $id $dfvars { $x[$i] := $y; } { $rest ... }
     }
 
     rule { $task $state_machine $id $dfvars { return $x:expr (,) ... ; } { $rest ... } } => {
@@ -1007,6 +1037,21 @@ macro step_state_line {
         return #{
             var tmp = $y;
             $x = $state_machine.dfbind($x, tmp);
+            case $id2:
+            step_state $task $state_machine $id2 $dfvars { $rest ... }
+        };
+    }
+
+    // If the binding expression is of the form "x[i] := something...;", then a new
+    // data flow variable is created into x[i] in situ and the RHS expression is bound
+    // to it. You can later await multiple results using "await x;"
+    case { $me $task $state_machine $id $dfvars { $x:ident[$xi:expr] := $y:expr; } { $rest ... } } => {
+        var id = unwrapSyntax(#{$id});
+        letstx $id2 = [makeValue(id + 1, #{$id})];
+        return #{
+            var tmpi = $xi, tmp = $y;
+            $x[tmpi] = $state_machine.dfvar(null, (function (x, i) { return function (val) { return x[i] = val; }; }($x, tmpi)));
+            $x[tmpi] = $state_machine.dfbind($x[tmpi], tmp);
             case $id2:
             step_state $task $state_machine $id2 $dfvars { $rest ... }
         };
