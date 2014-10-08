@@ -24,5 +24,44 @@ describe('dataflow_variables', function () {
             await y;
             assert.equal(y, 5);
         });
+        it('must permit dfvars to be created within arrays', task {
+            var b = task (x, v) { x := v; };
+            var y, z;
+            b(y, 5); // spawn b. 
+            b(z, 6);
+            assert.ok(y !== 5);
+            assert.ok(z !== 6);
+            var xs = [y, z];
+            await xs;
+            assert.deepEqual(xs, [5,6]);
+        });
+        it('must permit dfvars to be created within arrays lazily', task {
+            var b = task (x, v) { x := v; };
+            var y, z;
+            b(y, 5); // spawn b. 
+            b(z, 6);
+
+            var xs = [];
+            xs[0] := y;
+            xs[1] := z;
+            assert.ok(y !== 5);
+            assert.ok(z !== 6);
+            await xs;
+            assert.deepEqual(xs, [5,6]);
+        });
+        it('must permit dfvars to be created within objects lazily', task {
+            var b = task (x, v) { x := v; };
+            var y, z;
+            b(y, 5); // spawn b. 
+            b(z, 6);
+
+            var xs = {};
+            xs['hello'] := y;
+            xs['world'] := z;
+            assert.ok(y !== 5);
+            assert.ok(z !== 6);
+            await xs;
+            assert.deepEqual(xs, {hello: 5, world: 6});
+        });
     });
 });

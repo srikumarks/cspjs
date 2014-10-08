@@ -247,21 +247,16 @@ macro dfvar_decl_strip {
 
 macro declare_unique_varset {
 	case { _ $task $state_machine $fin ($v ...) ($u:dfvar_decl ...) ($us:dfvar_decl_strip ...) { $body ... } } => {
-		var vars = #{$v ... $u ...};
-		var varnames = vars.map(unwrapSyntax), pvarnames = (#{$us ...}).map(unwrapSyntax), pvardecls = (#{$u ...}).map(unwrapSyntax);
+        function onlyVars(v, i, vs) { return typeof(v) === 'string' && (i + 1 >= vs.length || typeof(vs[i+1]) === 'string'); }
+		var vars = #{$v ... $us ...};
+		var varnames = vars.map(unwrapSyntax), pvarnames = (#{$us ...}).map(unwrapSyntax), pvardecls = (#{$u ...}).map(unwrapSyntax).filter(onlyVars);
 		var uniqvarnames = {}, uniqpvarnames = {}, uniqpvardecls = {};
 		varnames.forEach(function (v) { uniqvarnames['%' + v] = true; });
 		pvarnames.forEach(function (v) { uniqpvarnames['%' + v] = true; }); // With "x[]" forms stripped of the "[]".
         pvardecls.forEach(function (v) { uniqpvardecls['%' + v] = true; });
 		letstx $uvvars ... = Object.keys(uniqvarnames).map(function (v) { return makeIdent(v.substring(1), #{$task}); });
 		letstx $uusvars ... = Object.keys(uniqpvarnames).map(function (v) { return makeIdent(v.substring(1), #{$task}); });
-		letstx $uuvars ... = Object.keys(uniqpvardecls).map(function (v) { 
-            try {
-                return makeIdent(v.substring(1), #{$task});
-            } catch (e) {
-                return null;
-            }
-        }).filter(function (x) { return x !== null; });
+		letstx $uuvars ... = Object.keys(uniqpvardecls).map(function (v) { return makeIdent(v.substring(1), #{$task}); });
         letstx $state_machine_fn = [makeIdent("state_machine_fn", #{$task})];
 		return #{ 
             declare_varset $task $state_machine $fin ($uvvars ...) ;
@@ -293,7 +288,7 @@ macro declare_pvarset {
     }
     case { _ $task $state_machine ($u ...) ; } => {
         return #{
-            $($u = $state_machine.dfvar($u, function (v) { $u = v; });) ...
+            $($u = $state_machine.dfvar($u, function (v) { return $u = v; });) ...
         };
     }
 }
@@ -325,7 +320,8 @@ macro declare_state_variables_step {
     // If a variable is being awaited on, we assume it could be a data flow variable.
     // Saves an additional var statement to declare the variable as a data flow variable.
 	rule { $task $state_machine $fin $vs ($u ...) { $bodypass ... } { await $x:ident ... ; } { $rest ... } } => {
-		declare_state_variables $task $state_machine $fin $vs ($x ... $u ...) { $bodypass ... } { $rest ... }
+        // NO: Don't do that.
+		declare_state_variables $task $state_machine $fin $vs ($u ...) { $bodypass ... } { $rest ... }
 	}
 	rule { $task $state_machine $fin $vs $us { $bodypass ... } { $x ... ; } { $rest ... } } => {
 		declare_state_variables $task $state_machine $fin $vs $us { $bodypass ... } { $rest ... }
@@ -846,12 +842,12 @@ macro step_state_line_with_ensure_dfv {
     }	
 
     rule { $task $state_machine $id $dfvars { $x:ident := $y:expr; } { $rest ... } } => {
-        ensure_dfv $state_machine $id $dfvars { $y } ;
+        // ensure_dfv $state_machine $id $dfvars { $y } ;
         step_state_line $task $state_machine $id $dfvars { $x := $y; } { $rest ... }
     }
 
     rule { $task $state_machine $id $dfvars { $x:ident[$i:expr] := $y:expr; } { $rest ... } } => {
-        ensure_dfv $state_machine $id $dfvars { $y } ;
+        // ensure_dfv $state_machine $id $dfvars { $y } ;
         step_state_line $task $state_machine $id $dfvars { $x[$i] := $y; } { $rest ... }
     }
 

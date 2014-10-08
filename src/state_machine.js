@@ -315,7 +315,7 @@ StateMachine.prototype.dfvar = function (v, binder) {
     // The binder is the one that ensures that once the dfv
     // is resolved, the variable ceases to be a dfv and becomes
     // a regular value.
-    dfv.promise.then(binder);
+    dfv.promise = dfv.promise.then(binder);
 
     return dfv;
 };
@@ -364,7 +364,13 @@ StateMachine.prototype.isDataFlowVar = function (x) {
 };
 
 StateMachine.prototype.ensure = function (id) {
-    return this.ensureAll(Array.prototype.slice.call(arguments, 1), this.thenTo(id));
+    if (this.state.ensuring) {
+        this.state.ensuring = false;
+        return true;
+    } else {
+        this.state.ensuring = true;
+        return this.ensureAll(Array.prototype.slice.call(arguments, 1), this.thenTo(id));
+    }
 }
 
 StateMachine.prototype.ensureOne = function (a, callback) {
@@ -382,30 +388,36 @@ StateMachine.prototype.ensureOne = function (a, callback) {
 };
 
 StateMachine.prototype.ensureAll = function (arr, callback) {
-    var i = 0, sm = this;
+    var i = 0, sm = this, async = false;
     var next = function (err) {
-        if (err) { return callback(err); }
+        if (err) { console.error(err); return callback(err); }
         while (i < arr.length) {
             if (!sm.ensureOne(arr[i++], next)) {
+                async = true;
                 return false;
             }
         }
-        callback(null, arr);
+        if (async) {
+            callback(null, arr);
+        }
         return true;
     };
     return next(null);
 };
 
 StateMachine.prototype.ensureAllKeys = function (obj, callback) {
-    var i = 0, sm = this, keys = Object.keys(obj);
+    var i = 0, sm = this, keys = Object.keys(obj), async = false;
     var next = function (err) {
-        if (err) { return callback(err); }
+        if (err) { console.error(err); return callback(err); }
         while (i < keys.length) {
             if (!sm.ensureOne(obj[keys[i++]], next)) {
+                async = true;
                 return false;
             }
         }
-        callback(null, obj);
+        if (async) {
+            callback(null, obj);
+        }
         return true;
     };
     return next(null);
