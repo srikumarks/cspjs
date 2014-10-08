@@ -24,15 +24,14 @@ describe('dataflow_variables', function () {
             await y;
             assert.equal(y, 5);
         });
-        it('must permit dfvars to be created within arrays', task {
+        it('must permit dfvars to be realized within arrays', task {
             var b = task (x, v) { x := v; };
             var y, z;
             b(y, 5); // spawn b. 
             b(z, 6);
             assert.ok(y !== 5);
             assert.ok(z !== 6);
-            var xs = [y, z];
-            await xs;
+            var xs = [y, z]; // Doesn't need an await.
             assert.deepEqual(xs, [5,6]);
         });
         it('must permit dfvars to be created within arrays lazily', task {
@@ -49,6 +48,16 @@ describe('dataflow_variables', function () {
             await xs;
             assert.deepEqual(xs, [5,6]);
         });
+        it('must permit dfvars to be realized within objects', task {
+            var b = task (x, v) { x := v; };
+            var y, z;
+            b(y, 5); // spawn b. 
+            b(z, 6);
+            assert.ok(y !== 5);
+            assert.ok(z !== 6);
+            var xs = {hello: y, world: z}; // Doesn't need an await.
+            assert.deepEqual(xs, {hello: 5, world: 6});
+        });        
         it('must permit dfvars to be created within objects lazily', task {
             var b = task (x, v) { x := v; };
             var y, z;
