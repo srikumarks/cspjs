@@ -299,8 +299,8 @@ macro dfvar_decl {
 }
 
 macro declare_state_variables_step {
-	rule { $task $state_machine $fin ($v ...) ($u ...) { $bodypass ... } { $x:ident <- $y ... ; } { $rest ... } } => {
-		declare_state_variables $task $state_machine $fin ($x $v ...) ($u ...) { $bodypass ... } { $rest ... }
+	rule { $task $state_machine $fin ($v ...) $us { $bodypass ... } { $x:ident <- $y ... ; } { $rest ... } } => {
+		declare_state_variables $task $state_machine $fin ($x $v ...) $us { $bodypass ... } { $rest ... }
 	}
 	rule { $task $state_machine $fin ($v ...) $us { $bodypass ... } { $x:ident (,) ... <- $y ... ; } { $rest ... } } => {
 		declare_state_variables $task $state_machine $fin ($x ... $v ...) $us { $bodypass ... } { $rest ... }
@@ -319,9 +319,9 @@ macro declare_state_variables_step {
 	}
     // If a variable is being awaited on, we assume it could be a data flow variable.
     // Saves an additional var statement to declare the variable as a data flow variable.
-	rule { $task $state_machine $fin $vs ($u ...) { $bodypass ... } { await $x:ident ... ; } { $rest ... } } => {
+	rule { $task $state_machine $fin $vs $us { $bodypass ... } { await $x:ident ... ; } { $rest ... } } => {
         // NO: Don't do that.
-		declare_state_variables $task $state_machine $fin $vs ($u ...) { $bodypass ... } { $rest ... }
+		declare_state_variables $task $state_machine $fin $vs $us { $bodypass ... } { $rest ... }
 	}
 	rule { $task $state_machine $fin $vs $us { $bodypass ... } { $x ... ; } { $rest ... } } => {
 		declare_state_variables $task $state_machine $fin $vs $us { $bodypass ... } { $rest ... }
