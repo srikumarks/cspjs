@@ -24,6 +24,14 @@ describe('dataflow_variables', function () {
             await y;
             assert.equal(y, 5);
         });
+        it('must bind all connected variables including closure capture', task {
+            var b = task { y := 5; };
+            var y;
+            b(); // spawn b. 
+            assert.ok(y !== 5);
+            await y;
+            assert.equal(y, 5);
+        });
         it('must permit dfvars to be realized within arrays', task {
             var b = task (x, v) { x := v; };
             var y, z;

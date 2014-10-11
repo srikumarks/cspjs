@@ -240,28 +240,43 @@ macro declare_state_variables {
 // we don't want to pollute the generated code with repeated var declarations
 // as much as we can.
 
-macro dfvar_decl_strip {
-    rule { $x:ident[] } => { $x }
+macro dfvar_for_declarations {
+    rule { ! $x:ident } => { }
     rule { $x:ident } => { $x }
+    /*
+    rule { (dfawait $x:ident) } => { }
+    rule { (dfbind $x:ident) } => { }
+    rule { (dfcoll $x:ident) } => { }
+    */
+}
+
+macro dfvar_for_scanning {
+    rule { ! $x:ident } => { $x }
+    rule { $x:ident } => { $x }
+    /*
+    rule { (dfvar $x:ident) } => { $x }
+    rule { (dfawait $x:ident) } => { $x }
+    rule { (dfbind $x:ident) } => { $x }
+    rule { (dfcoll $x:ident) } => { $x }
+    */
 }
 
 macro declare_unique_varset {
-	case { _ $task $state_machine $fin ($v ...) ($u:dfvar_decl ...) ($us:dfvar_decl_strip ...) { $body ... } } => {
-        function onlyVars(v, i, vs) { return typeof(v) === 'string' && (i + 1 >= vs.length || typeof(vs[i+1]) === 'string'); }
+	case { _ $task $state_machine $fin ($v ...) ($u:dfvar_for_scanning ...) ($us:dfvar_for_declarations ...) { $body ... } } => {
 		var vars = #{$v ... $us ...};
-		var varnames = vars.map(unwrapSyntax), pvarnames = (#{$us ...}).map(unwrapSyntax), pvardecls = (#{$u ...}).map(unwrapSyntax).filter(onlyVars);
-		var uniqvarnames = {}, uniqpvarnames = {}, uniqpvardecls = {};
-		varnames.forEach(function (v) { uniqvarnames['%' + v] = true; });
-		pvarnames.forEach(function (v) { uniqpvarnames['%' + v] = true; }); // With "x[]" forms stripped of the "[]".
-        pvardecls.forEach(function (v) { uniqpvardecls['%' + v] = true; });
-		letstx $uvvars ... = Object.keys(uniqvarnames).map(function (v) { return makeIdent(v.substring(1), #{$task}); });
-		letstx $uusvars ... = Object.keys(uniqpvarnames).map(function (v) { return makeIdent(v.substring(1), #{$task}); });
-		letstx $uuvars ... = Object.keys(uniqpvardecls).map(function (v) { return makeIdent(v.substring(1), #{$task}); });
+		var varnames = vars, pvardecls = #{$us ...}, pvarscans = #{$u ...};
+		var uniqvarnames = {}, uniqpvardecls = {}, uniqpvarscans = {};
+		varnames.forEach(function (v) { uniqvarnames['%' + v.token.value] = uniqvarnames['%' + v.token.value] || v; });
+		pvardecls.forEach(function (v) { uniqpvardecls['%' + v.token.value] = uniqpvardecls['%' + v.token.value] || v; }); // With "x[]" forms stripped of the "[]".
+        pvarscans.forEach(function (v) { uniqpvarscans['%' + v.token.value] = uniqpvarscans['%' + v.token.value] || v; });
+		letstx $dvars ... = Object.keys(uniqvarnames).map(function (v) { return uniqvarnames[v]; });
+		letstx $pdeclvars ... = Object.keys(uniqpvardecls).map(function (v) { return uniqpvardecls[v]; });
+		letstx $pscanvars ... = Object.keys(uniqpvarscans).map(function (v) { return uniqpvarscans[v]; });
         letstx $state_machine_fn = [makeIdent("state_machine_fn", #{$task})];
 		return #{ 
-            declare_varset $task $state_machine $fin ($uvvars ...) ;
-            declare_pvarset $task $state_machine ($uuvars ...) ;
-            post_declare $task $state_machine $state_machine_fn ($uusvars ...) { $body ... }
+            declare_varset $task $state_machine $fin ($dvars ...) ;
+            declare_pvarset $task $state_machine ($pdeclvars ...) ;
+            post_declare $task $state_machine $state_machine_fn ($pscanvars ...) { $body ... }
         };
 	}
 }
@@ -293,11 +308,6 @@ macro declare_pvarset {
     }
 }
 
-macro dfvar_decl {
-    rule { $x:ident[] } => { $x[] }
-    rule { $x:ident } => { $x }
-}
-
 macro declare_state_variables_step {
 	rule { $task $state_machine $fin ($v ...) $us { $bodypass ... } { $x:ident <- $y ... ; } { $rest ... } } => {
 		declare_state_variables $task $state_machine $fin ($x $v ...) $us { $bodypass ... } { $rest ... }
@@ -306,10 +316,10 @@ macro declare_state_variables_step {
 		declare_state_variables $task $state_machine $fin ($x ... $v ...) $us { $bodypass ... } { $rest ... }
 	}
 	rule { $task $state_machine $fin $vs ($u ...) { $bodypass ... } { $x:ident := $y ... ; } { $rest ... } } => {
-		declare_state_variables $task $state_machine $fin $vs ($x $u ...) { $bodypass ... } { $rest ... }
+		declare_state_variables $task $state_machine $fin $vs (! $x $u ...) { $bodypass ... } { $rest ... }
 	}
 	rule { $task $state_machine $fin $vs ($u ...) { $bodypass ... } { $x:ident[$xi:expr] := $y ... ; } { $rest ... } } => {
-		declare_state_variables $task $state_machine $fin $vs ($x[] $u ...) { $bodypass ... } { $rest ... }
+		declare_state_variables $task $state_machine $fin $vs (! $x $u ...) { $bodypass ... } { $rest ... }
 	}
 	rule { $task $state_machine $fin ($v ...) $us { $bodypass ... } { var $($x:ident = $y:expr) (,) ... ; } { $rest ... } } => {
 		declare_state_variables $task $state_machine $fin ($x ... $v ...) $us { $bodypass ... } { $rest ... }
@@ -319,9 +329,9 @@ macro declare_state_variables_step {
 	}
     // If a variable is being awaited on, we assume it could be a data flow variable.
     // Saves an additional var statement to declare the variable as a data flow variable.
-	rule { $task $state_machine $fin $vs $us { $bodypass ... } { await $x:ident ... ; } { $rest ... } } => {
+	rule { $task $state_machine $fin $vs ($u ...) { $bodypass ... } { await $x:ident ... ; } { $rest ... } } => {
         // NO: Don't do that.
-		declare_state_variables $task $state_machine $fin $vs $us { $bodypass ... } { $rest ... }
+		declare_state_variables $task $state_machine $fin $vs ($(! $x) ... $u ...) { $bodypass ... } { $rest ... }
 	}
 	rule { $task $state_machine $fin $vs $us { $bodypass ... } { $x ... ; } { $rest ... } } => {
 		declare_state_variables $task $state_machine $fin $vs $us { $bodypass ... } { $rest ... }
@@ -758,7 +768,7 @@ macro ensure_dfv {
         function dfvars(stx, test) {
             var result = {};
             var enabled = [];
-            function scan(stx) {
+            function scan(stx, i, stxs) {
                 if (stx && stx.token) {
                     if (stx.token.value === '.') {
                         /* Disable identifier matching after periods in a sequence. */
@@ -773,9 +783,13 @@ macro ensure_dfv {
                             enabled[enabled.length - 1] = true;
                         }
                     } else if (stx.token.inner) {
-                        enabled.push(true);
-                        stx.token.inner.forEach(scan);
-                        enabled.pop();
+                        if (stx.token.value === '{}' && ((i >= 2 && stxs[i-2].token.value === 'function') || (i >= 3 && stxs[i-3].token.value === 'function'))) {
+                            // Ignore.
+                        } else {
+                            enabled.push(true);
+                            stx.token.inner.forEach(scan);
+                            enabled.pop();
+                        }
                     }
                 } else if (stx) {
                     enabled.push(true);
