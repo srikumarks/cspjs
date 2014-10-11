@@ -177,7 +177,7 @@ macro post_declare {
 macro setup_state_machine {
     case { $me $task $callback $formals { $body ... } } => {
         letstx $state_machine_fn = [makeIdent("state_machine_fn", #{$task})];
-        return #{
+        var result = #{
             var StateMachine = arguments.callee.StateMachine || (arguments.callee.StateMachine = require('cspjs/src/state_machine'));
             declare_state_arguments $formals
             var state_machine = new StateMachine(this, $callback, $state_machine_fn, arguments.callee);
@@ -185,6 +185,7 @@ macro setup_state_machine {
             state_machine.start();
             return state_machine.controlAPIMaker;
         };
+        return result;
     }
 }
 
@@ -243,35 +244,27 @@ macro declare_state_variables {
 macro dfvar_for_declarations {
     rule { ! $x:ident } => { }
     rule { $x:ident } => { $x }
-    /*
-    rule { (dfawait $x:ident) } => { }
-    rule { (dfbind $x:ident) } => { }
-    rule { (dfcoll $x:ident) } => { }
-    */
 }
 
 macro dfvar_for_scanning {
     rule { ! $x:ident } => { $x }
     rule { $x:ident } => { $x }
-    /*
-    rule { (dfvar $x:ident) } => { $x }
-    rule { (dfawait $x:ident) } => { $x }
-    rule { (dfbind $x:ident) } => { $x }
-    rule { (dfcoll $x:ident) } => { $x }
-    */
 }
 
 macro declare_unique_varset {
 	case { _ $task $state_machine $fin ($v ...) ($u:dfvar_for_scanning ...) ($us:dfvar_for_declarations ...) { $body ... } } => {
-		var vars = #{$v ... $us ...};
-		var varnames = vars, pvardecls = #{$us ...}, pvarscans = #{$u ...};
-		var uniqvarnames = {}, uniqpvardecls = {}, uniqpvarscans = {};
-		varnames.forEach(function (v) { uniqvarnames['%' + v.token.value] = uniqvarnames['%' + v.token.value] || v; });
-		pvardecls.forEach(function (v) { uniqpvardecls['%' + v.token.value] = uniqpvardecls['%' + v.token.value] || v; }); // With "x[]" forms stripped of the "[]".
-        pvarscans.forEach(function (v) { uniqpvarscans['%' + v.token.value] = uniqpvarscans['%' + v.token.value] || v; });
-		letstx $dvars ... = Object.keys(uniqvarnames).map(function (v) { return uniqvarnames[v]; });
-		letstx $pdeclvars ... = Object.keys(uniqpvardecls).map(function (v) { return uniqpvardecls[v]; });
-		letstx $pscanvars ... = Object.keys(uniqpvarscans).map(function (v) { return uniqpvarscans[v]; });
+		var varnames = #{$v ... $us ...}, pvardecls = #{$us ...}, pvarscans = #{$u ...};
+        function uniquify(arr) {
+            var hash = {};
+            arr.forEach(function (a) {
+                var k = '%' + a.token.value;
+                hash[k] = hash[k] || a;
+            });
+            return Object.keys(hash).map(function (v) { return hash[v]; });
+        }
+		letstx $dvars ... = uniquify(varnames);
+		letstx $pdeclvars ... = uniquify(pvardecls);
+		letstx $pscanvars ... = uniquify(pvarscans);
         letstx $state_machine_fn = [makeIdent("state_machine_fn", #{$task})];
 		return #{ 
             declare_varset $task $state_machine $fin ($dvars ...) ;
