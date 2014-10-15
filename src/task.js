@@ -177,7 +177,7 @@ macro post_declare {
 macro setup_state_machine {
     case { $me $task $callback $formals { $body ... } } => {
         letstx $state_machine_fn = [makeIdent("state_machine_fn", #{$task})];
-        var result = #{
+        return #{
             var StateMachine = arguments.callee.StateMachine || (arguments.callee.StateMachine = require('cspjs/src/state_machine'));
             declare_state_arguments $formals
             var state_machine = new StateMachine(this, $callback, $state_machine_fn, arguments.callee);
@@ -185,7 +185,6 @@ macro setup_state_machine {
             state_machine.start();
             return state_machine.controlAPIMaker;
         };
-        return result;
     }
 }
 
@@ -300,6 +299,8 @@ macro declare_pvarset {
         };
     }
 }
+
+
 
 macro declare_state_variables_step {
 	rule { $task $state_machine $fin ($v ...) $us { $bodypass ... } { $x:ident <- $y ... ; } { $rest ... } } => {
