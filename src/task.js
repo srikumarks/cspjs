@@ -272,6 +272,9 @@ macro declare_state_variables_step {
 	rule { $task $state_machine $fin ($v ...) { var $($x:ident = $y:expr) (,) ... ; } { $rest ... } } => {
 		declare_state_variables $task $state_machine $fin ($x ... $v ...) { $rest ... }
 	}
+	rule { $task $state_machine $fin ($v ...) { var $x:ident (,) ... ; } { $rest ... } } => {
+		declare_state_variables $task $state_machine $fin ($x ... $v ...) { $rest ... }
+	}
 	rule { $task $state_machine $fin $vs { $x ... ; } { $rest ... } } => {
 		declare_state_variables $task $state_machine $fin $vs { $rest ... }
 	}
@@ -787,6 +790,18 @@ macro step_state_line {
         letstx $id2 = [makeValue(id + 1, #{$id})];
         return #{
             $($x = $y;) ...
+            case $id2:
+            step_state $task $state_machine $id2 { $rest ... }			
+        };
+    }	
+
+    // State variables should never be declared unintialized. So we assume that if
+    // they are, then the variables are supposed to be channels and auto-initialize them.
+    case { $me $task $state_machine $id { var $x:ident (,) ... ; } { $rest ... } } => {
+        var id = unwrapSyntax(#{$id});
+        letstx $id2 = [makeValue(id + 1, #{$id})];
+        return #{
+            $($x = $x || $state_machine.channel();) ...
             case $id2:
             step_state $task $state_machine $id2 { $rest ... }			
         };

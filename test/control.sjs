@@ -410,11 +410,11 @@ describe('switch', function () {
 });
 
 describe('dfvars', function () {
-    describe('<=', function () {
-        function greet(msg, callback) {
-            setTimeout(callback, 10, null, msg);
-        }
+    function greet(msg, callback) {
+        setTimeout(callback, 10, null, msg);
+    }
 
+    describe('<=', function () {
         it('must declare and initialize a channel variable', task {
             x <= greet('hello');
             assert.ok(x instanceof Channel);
@@ -441,6 +441,26 @@ describe('dfvars', function () {
             };
 
             var x = new Channel(), y = new Channel();
+            t1(x, y);
+            await x y;
+            assert.equal(x, 'hello');
+            assert.equal(y, 'world');
+        });
+
+    });
+
+    describe('var', function () {
+        it('must declare uninitialied variables as channels', task {
+            var t1 = task (ch1, ch2) {
+                ch1 <= greet('hello');
+                await ch1;
+                assert.equal(ch1, 'hello');
+                ch2 <= greet('world');
+                await ch2;
+                assert.equal(ch2, 'world');
+            };
+
+            var x, y;
             t1(x, y);
             await x y;
             assert.equal(x, 'hello');
