@@ -449,8 +449,8 @@ describe('dfvars', function () {
 
     });
 
-    describe('var', function () {
-        it('must declare uninitialied variables as channels', task {
+    describe('chan', function () {
+        it('must declare channels', task {
             var t1 = task (ch1, ch2) {
                 ch1 <= greet('hello');
                 await ch1;
@@ -460,7 +460,7 @@ describe('dfvars', function () {
                 assert.equal(ch2, 'world');
             };
 
-            var x, y;
+            chan x, y;
             t1(x, y);
             await x y;
             assert.equal(x, 'hello');
