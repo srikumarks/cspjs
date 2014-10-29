@@ -409,3 +409,42 @@ describe('switch', function () {
     });
 });
 
+describe('dfvars', function () {
+    describe('<=', function () {
+        function greet(msg, callback) {
+            setTimeout(callback, 10, null, msg);
+        }
+
+        it('must declare and initialize a channel variable', task {
+            x <= greet('hello');
+            assert.ok(x instanceof Channel);
+        });
+
+        it('must run in parallel', task {
+            x <= greet('one');
+            y <= greet('two');
+            assert.ok(x instanceof Channel);
+            assert.ok(y instanceof Channel);
+            await x y;
+            assert.equal(x, 'one');
+            assert.equal(y, 'two');
+        });
+
+        it('must also work across tasks', task {
+            var t1 = task (ch1, ch2) {
+                ch1 <= greet('hello');
+                await ch1;
+                assert.equal(ch1, 'hello');
+                ch2 <= greet('world');
+                await ch2;
+                assert.equal(ch2, 'world');
+            };
+
+            var x = new Channel(), y = new Channel();
+            t1(x, y);
+            await x y;
+            assert.equal(x, 'hello');
+            assert.equal(y, 'world');
+        });
+    });
+});

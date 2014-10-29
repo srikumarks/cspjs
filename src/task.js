@@ -260,6 +260,9 @@ macro declare_varset {
 }
 
 macro declare_state_variables_step {
+	rule { $task $state_machine $fin ($v ...) { $x:ident <= $y ... ; } { $rest ... } } => {
+		declare_state_variables $task $state_machine $fin ($x $v ...) { $rest ... }
+	}
 	rule { $task $state_machine $fin ($v ...) { $x:ident <- $y ... ; } { $rest ... } } => {
 		declare_state_variables $task $state_machine $fin ($x $v ...) { $rest ... }
 	}
@@ -382,6 +385,12 @@ macro count_states_line {
     }
     rule { $task ($n ...) { $x:ident (,) ... <- $y ... ($args:expr (,) ...); } { $rest ... } } => {
         count_states $task (2 $n ...) { $rest ... }
+    }
+    rule { $task ($n ...) { $x:ident <= $y ... (); } { $rest ... } } => {
+        count_states $task (1 $n ...) { $rest ... }
+    }
+    rule { $task ($n ...) { $x:ident <= $y ... ($args:expr (,) ...); } { $rest ... } } => {
+        count_states $task (1 $n ...) { $rest ... }
     }
     rule { $task ($n ...) { $step ... ; } { $rest ... } } => {
         count_states $task (1 $n ...) { $rest ... }
@@ -656,6 +665,19 @@ macro step_state_line {
         };
     }
 
+    case { $me $task $state_machine $id { await $x:ident ... ; } { $rest ... } } => {
+        var id = unwrapSyntax(#{$id});
+        letstx $id2 = [makeValue(id + 1, #{$id})];
+        return #{
+            $state_machine.resolve([$x (,) ...], false, $state_machine.thenTo($id2));
+            break;
+            case $id2:
+                var chans = arguments[1], i = 0;
+                $($x = chans[i++].resolve();)...
+                step_state $task $state_machine $id2 { $rest ... }
+        };
+    }        
+
     // ### Taking values from channels
     //
     // If you have functions that return channels on which they will produce their results,
@@ -697,6 +719,14 @@ macro step_state_line {
     // This block and the following are basically the same. The problem is that I don't know
     // how to insert the additional callback argument with a preceding comma in one
     // case and without one in the other.
+    //
+    // If you use '<=' instead of '<-', the operation is started off in parallel and
+    // the variable on the LHS (only one allowed in this case) will be bound to a new channel
+    // on which the result can be received. You can subsequently do "await x;" to cause
+    // x to be bound to the value received on the new channel, and further statements
+    // can use the value directly. If you have multiple such channels bound to variables
+    // x, y, z, you can await for a single value from each of them using "await x y z;".
+    // If any errors occur, an exception will be raised. 
     case { $me $task $state_machine $id { $x:ident (,) ... <- $y ... (); } { $rest ... } } => {
         var id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + 1, #{$id})], $id3 = [makeValue(id + 2, #{$id})];
@@ -722,6 +752,28 @@ macro step_state_line {
             $($x = arguments[i++];) ...
             case $id3:
                 step_state $task $state_machine $id3 { $rest ... }
+        };
+    }
+
+    case { $me $task $state_machine $id { $x:ident <= $y ... (); } { $rest ... } } => {
+        var id = unwrapSyntax(#{$id});
+        letstx $id2 = [makeValue(id + 1, #{$id})];
+        return #{
+            $x = $x || $state_machine.channel();
+            $y ... ($x.resolver(0));
+            case $id2:
+                step_state $task $state_machine $id2 { $rest ... }
+        };
+    }
+
+    case { $me $task $state_machine $id { $x:ident <= $y ... ($args:expr (,) ...); } { $rest ... } } => {
+        var id = unwrapSyntax(#{$id});
+        letstx $id2 = [makeValue(id + 1, #{$id})];
+        return #{
+            $x = $x || $state_machine.channel();
+            $y ... ($args (,) ... , $x.resolver(0));
+            case $id2:
+                step_state $task $state_machine $id2 { $rest ... }
         };
     }
 

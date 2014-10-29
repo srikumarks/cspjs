@@ -116,6 +116,7 @@ Channel.prototype.tap = function (chan) {
     return tapChan;
 };
 
+
 // For an end-point channel, applies the given
 // function to values received on the channel.
 // The second argument to the function is a callback
@@ -196,6 +197,14 @@ function ReceivedChannelValue(id, err, value) {
     return this;
 }
 
+ReceivedChannelValue.prototype.resolve = function () {
+    if (this.err) {
+        throw this.err;
+    } else {
+        return this.val;
+    }
+};
+
 // Makes a callback that will receive the value produced by
 // some process and place the result into the channel. The
 // "id" exists to identify the one producing the value.
@@ -205,6 +214,17 @@ Channel.prototype.receive = function (id) {
     var self = this;
     return function (err, value) {
         self.put(new ReceivedChannelValue(id, err, value));
+    };
+};
+
+// Like receive, but results in the channel being 'filled'
+// with the value received on the callback. Once a value
+// is received, all subsequent take operations will give
+// the same value, and puts will result in an error.
+Channel.prototype.resolver = function (id) {
+    var self = this;
+    return function (err, value) {
+        self.fill(new ReceivedChannelValue(id, err, value));
     };
 };
 
@@ -293,6 +313,80 @@ Channel.prototype.group = function (N) {
     }).filter(function (g) { return g.length === N; });
 };
 
+function resolve(thing, recursive, callback) {
+    var unresolved = 0;
+
+    if (thing instanceof Channel) {
+        unresolved += resolveChannel(thing, recursive, callback);
+    } else if (thing instanceof Array) {
+        unresolved += resolveArray(thing, recursive, callback);
+    } else if (thing instanceof Object) {
+        unresolved += resolveObject(thing, recursive, callback);
+    } else {
+        sendValue(thing, callback);
+    }
+
+    return unresolved;
+}
+
+function resolveChannel(channel, recursive, callback) {
+    if (recursive) {
+        channel.take(function receiver(err, value) {
+            Channel.resolve(value, recursive, callback);
+        });
+    } else {
+        channel.take(callback);
+    }
+
+    return 1;
+}
+
+function resolveArray(arr, recursive, callback) {
+    var unresolved = 0;
+
+    for (var i = 0; i < arr.length; ++i) {
+        unresolved += resolve(arr[i], recursive, (function (i) {
+            return function receiver(err, value) {
+                if (recursive) {
+                    resolve(value, recursive, receiver);
+                } else {
+                    arr[i] = value;
+                    --unresolved;
+                    if (unresolved === 0) {
+                        callback(null, arr);
+                    }
+                }
+            };
+        }(i)));
+    }
+
+    return unresolved;
+}
+
+function resolveObject(obj, recursive, callback) {
+    unresolved = 0;
+    Object.keys(obj).forEach(function (k) {
+        unresolved += resolve(obj[k], recursive, function receiver(err, value) {
+            if (recursive) {
+                resolve(value, recursive, receiver);
+            } else {
+                obj[k] = value;
+                --unresolved;
+                if (unresolved === 0) {
+                    callback(null, obj);
+                }
+            }
+        });
+    });
+    return unresolved;
+}
+
+// Waits for all channels in the given array to get a value,
+// replaces the array element with the received value and calls
+// back when all entries have been resolved. If 'recursive' is
+// true, then if the value received on a channel is itself a channel,
+// it is recursively waited on until final resolution.
+Channel.resolve = resolve;
 
 // Temporarily switches the channel to a mode where it will
 // collect the next N items into a group and pass it on to
@@ -365,7 +459,7 @@ function noop() {}
 // once `fill` is called somewhere, `take` will always
 // succeed with a single value.
 Channel.prototype.fill = function (value) {
-    if (this._pending.length > 0) {
+    if (this.backlog() > 0) {
         throw new Error('Channel::fill cannot be used after Channel::put has been called');
     }
 
@@ -381,7 +475,7 @@ Channel.prototype.fill = function (value) {
 
     // If takers are already waiting, satisfy them
     // immediately.
-    while (this._queue.length > 0) {
+    while (this.backlog() < 0) {
         origPut.call(this, value);
     }
 
