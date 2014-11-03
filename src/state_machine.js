@@ -121,6 +121,33 @@ StateMachine.prototype.thenTo = function (id) {
     };
 };
 
+StateMachine.prototype.thenToWithErr = function (id) {
+    var done = false;
+    var self = this;
+    this.state.waiting++;
+    return function (err, result) {
+        var _self = self;
+        var _state = _self.state;
+        _state.waiting--;
+        if (!done) {
+            done = true;
+            _state.id = id;
+            if (_state.abort_with_error) {
+                _self.performAbort();
+            } else if (arguments.length <= 2) {
+                // Slightly more efficient in the common case.
+                _self.fn.call(_self.context, null, err, result);
+            } else {
+                var argv = Array.prototype.slice.call(arguments, 0);
+                argv.unshift(null); // Push the err argument to the explicit range.
+                _self.fn.apply(_self.context, argv); 
+            }
+        } else {
+            console.error('Callback called repeatedly!');
+        }
+    };
+};
+
 StateMachine.prototype.callback = function (err) {
     this.state.args = Array.prototype.slice.call(arguments);
     this.state.err = err;

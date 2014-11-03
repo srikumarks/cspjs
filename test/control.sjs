@@ -467,4 +467,16 @@ describe('dfvars', function () {
             assert.equal(y, 'world');
         });
     });
+
+    describe('<<-', function () {
+        it('must return err instead of throwing up', task {
+            var t1 = task (arg) {
+                throw "error: " + arg;
+            };
+
+            err, result <<- t1("meow");
+            assert.equal(err, "error: meow");
+            assert.equal(result, undefined);
+        });
+    });
 });

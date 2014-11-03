@@ -146,6 +146,18 @@ macro task {
 // to pipe their results. The merged channel will yield `{chan: ch, val: value}`
 // objects so that you can do different things based on the channel that
 // produced the value.
+//
+// Sometimes, you want to be able to handle an error in a recoverable way
+// after the async operation completes. You can use the `<<-` operator for
+// that. It works in the same way as the `<-` operator, except that the
+// first variable is bound to the error. No async exception is raised with this
+// operator. For example -
+//
+//     err, result <<- fs.readFile("somewhere/file.txt", 'utf8');
+//     if (err) {
+//          result = "Default value";
+//     }
+//
 
 // ## Setting up the state machine
 // 
@@ -266,7 +278,13 @@ macro declare_state_variables_step {
 	rule { $task $state_machine $fin ($v ...) { $x:ident <- $y ... ; } { $rest ... } } => {
 		declare_state_variables $task $state_machine $fin ($x $v ...) { $rest ... }
 	}
+	rule { $task $state_machine $fin ($v ...) { $x:ident <<- $y ... ; } { $rest ... } } => {
+		declare_state_variables $task $state_machine $fin ($x $v ...) { $rest ... }
+	}
 	rule { $task $state_machine $fin ($v ...) { $x:ident (,) ... <- $y ... ; } { $rest ... } } => {
+		declare_state_variables $task $state_machine $fin ($x ... $v ...) { $rest ... }
+	}
+	rule { $task $state_machine $fin ($v ...) { $x:ident (,) ... <<- $y ... ; } { $rest ... } } => {
 		declare_state_variables $task $state_machine $fin ($x ... $v ...) { $rest ... }
 	}
 	rule { $task $state_machine $fin ($v ...) { var $($x:ident = $y:expr) (,) ... ; } { $rest ... } } => {
@@ -386,7 +404,13 @@ macro count_states_line {
     rule { $task ($n ...) { $x:ident (,) ... <- $y ... (); } { $rest ... } } => {
         count_states $task (2 $n ...) { $rest ... }
     }
+    rule { $task ($n ...) { $x:ident (,) ... <<- $y ... (); } { $rest ... } } => {
+        count_states $task (2 $n ...) { $rest ... }
+    }
     rule { $task ($n ...) { $x:ident (,) ... <- $y ... ($args:expr (,) ...); } { $rest ... } } => {
+        count_states $task (2 $n ...) { $rest ... }
+    }
+    rule { $task ($n ...) { $x:ident (,) ... <<- $y ... ($args:expr (,) ...); } { $rest ... } } => {
         count_states $task (2 $n ...) { $rest ... }
     }
     rule { $task ($n ...) { $x:ident <= $y ... (); } { $rest ... } } => {
@@ -744,11 +768,40 @@ macro step_state_line {
         };
     }
 
+    case { $me $task $state_machine $id { $x:ident (,) ... <<- $y ... (); } { $rest ... } } => {
+        var id = unwrapSyntax(#{$id});
+        letstx $id2 = [makeValue(id + 1, #{$id})], $id3 = [makeValue(id + 2, #{$id})];
+        return #{
+            $y ... ($state_machine.thenToWithErr($id2));
+            break;
+            case $id2:
+            var i = 1;
+            $($x = arguments[i++];) ...
+            case $id3:
+                step_state $task $state_machine $id3 { $rest ... }
+        };
+    }
+
+
     case { $me $task $state_machine $id { $x:ident (,) ... <- $y ... ($args:expr (,) ...); } { $rest ... } } => {
         var id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + 1, #{$id})], $id3 = [makeValue(id + 2, #{$id})];
         return #{
             $y ... ($args (,) ... , $state_machine.thenTo($id2));
+            break;
+            case $id2:
+            var i = 1;
+            $($x = arguments[i++];) ...
+            case $id3:
+                step_state $task $state_machine $id3 { $rest ... }
+        };
+    }
+
+    case { $me $task $state_machine $id { $x:ident (,) ... <<- $y ... ($args:expr (,) ...); } { $rest ... } } => {
+        var id = unwrapSyntax(#{$id});
+        letstx $id2 = [makeValue(id + 1, #{$id})], $id3 = [makeValue(id + 2, #{$id})];
+        return #{
+            $y ... ($args (,) ... , $state_machine.thenToWithErr($id2));
             break;
             case $id2:
             var i = 1;
