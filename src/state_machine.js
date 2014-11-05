@@ -148,10 +148,16 @@ StateMachine.prototype.thenToWithErr = function (id) {
     };
 };
 
+// StateMachine supports a single global error notification point.
+// You can set StateMachine.onerror to an error callback function that
+// will be called asynchronously with two arguments - the error and 
+// the state machine instance within which the error was raised.
+// You can use this, for example, to log all such errors.
 StateMachine.prototype.callback = function (err) {
     this.state.args = Array.prototype.slice.call(arguments);
     this.state.err = err;
     this.state.strict_unwind = true;
+    StateMachine.onerror && nextTick(StateMachine.onerror, err, this);
     nextTick(this.boundUnwind);
 };
 

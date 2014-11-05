@@ -1,4 +1,5 @@
 var Channel = require('cspjs/channel');
+var StateMachine = require('cspjs/src/state_machine');
 var assert = require('assert');
 
 describe('errors', function () {
@@ -477,6 +478,22 @@ describe('dfvars', function () {
             err, result <<- t1("meow");
             assert.equal(err, "error: meow");
             assert.equal(result, undefined);
+        });
+    });
+
+    describe('StateMachine.onerror', function () {
+        var errorCount = 0;
+        StateMachine.onerror = function (err, sm) {
+            ++errorCount;
+        };
+        it('must be called on any error, anywhere', task {
+            var currentError = errorCount;
+            catch (e) {
+                assert.equal(errorCount, currentError + 1);
+                return true;
+            }
+
+            throw new Error('test');
         });
     });
 });
