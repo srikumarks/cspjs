@@ -157,7 +157,7 @@ StateMachine.prototype.callback = function (err) {
     this.state.args = Array.prototype.slice.call(arguments);
     this.state.err = err;
     this.state.strict_unwind = true;
-    StateMachine.onerror && nextTick(StateMachine.onerror, err, this);
+    err && StateMachine.onerror && nextTick(StateMachine.onerror, err, this);
     nextTick(this.boundUnwind);
 };
 
