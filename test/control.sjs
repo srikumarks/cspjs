@@ -363,6 +363,20 @@ describe('if_then_else', function () {
 });
 
 describe('switch', function () {
+    it('must work within for loop', task {
+        var i = 0, arr = [];
+        finally {
+            assert.deepEqual(arr, ["one", "two", "three", "end"]);
+        }
+        for (i = 0; i < 3; ++i) {
+            switch (i) {
+                case 0: { arr.push("one"); }
+                case 1: { arr.push("two"); }
+                case 2: { arr.push("three"); }
+            }
+        }
+        arr.push("end");
+    });
     it('must switch correctly on numeric index', task {
         var choice = {1: "one", 2: "two", 3: "three"};
         for (var key = 0, value; key < 3; ++key) {

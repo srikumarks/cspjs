@@ -384,8 +384,8 @@ macro count_states {
     rule { $task ($n ...) { catch ($e ...) { $handler ... } $rest ... } } => {
         count_states $task (2 $n ...) { $handler ... $rest ... }
     }
-    rule { $task $n  { switch ($x ...) { $(case $ix:lit (,) ... : { $body ... }) ... } $rest ... } } => {
-        count_states $task $n { $($body ... phi $state_machine ;) ... $rest ... }
+    rule { $task ($n ...)  { switch ($x ...) { $(case $ix:lit (,) ... : { $body ... }) ... } $rest ... } } => {
+        count_states $task (1 $n ...) { $($body ... phi $state_machine ;) ... $rest ... }
     }
     rule { $task $n { $step ... ; $rest ... } } => {
         count_states_line $task $n { $step ... ; } { $rest ... }
