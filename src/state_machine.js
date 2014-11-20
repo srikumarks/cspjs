@@ -13,6 +13,7 @@ function State() {
     this.id = 0;
     this.args = [null, null];
     this.err = null;
+    this.suspension = null;
     this.unwinding = [];
     this.waiting = 0;
     this.isFinished = false;
@@ -20,6 +21,28 @@ function State() {
     this.currentErrorStep = null;
     this.abort_with_error = null;
     return this;
+}
+
+function Suspension(vars, id, argv, context) {
+    this.vars = vars;
+    this.id = id;
+    this.argv = argv || [];
+    this.context = context || null;
+}
+
+function captureSuspension(state_machine, id) {
+    return new Suspension(state_machine.captureStateVars ? state_machine.captureStateVars() : [], id, [], null);
+}
+
+// Resumes the current state machine or the given one, from
+// the suspended state.
+function resumeSuspension(suspension, state_machine) {
+    if (state_machine.restoreStateVars) {
+        state_machine.restoreStateVars(suspension.vars);
+    }
+
+    var callback = state_machine.thenTo(suspension.id);
+    callback.apply(state_machine.context, suspension.argv); 
 }
 
 function controlAPIMaker() {
@@ -48,8 +71,14 @@ function controlAPIMaker() {
 }
 
 function StateMachine(context, callback, fn, task_fn) {
-
     this.state = new State();
+
+    if (context && context.vars && context.id && context.argv) {
+        // This is a suspension
+        this.state.suspension = new Suspension(context.vars, context.id, context.argv, context.context);
+        context = context.context;
+    }
+
     this.fn = fn;
     this.task_fn = task_fn;
     this.context = context;
@@ -72,7 +101,13 @@ function StateMachine(context, callback, fn, task_fn) {
 }
 
 StateMachine.prototype.start = function () {
-    this.goTo(1);
+    if (this.state.suspension) {
+        var suspension = this.state.suspension;
+        this.state.suspension = null;
+        resumeSuspension(suspension, this);
+    } else {
+        this.goTo(1);
+    }
 };
 
 StateMachine.prototype.step = function () {
@@ -146,6 +181,20 @@ StateMachine.prototype.thenToWithErr = function (id) {
             console.error('Callback called repeatedly!');
         }
     };
+};
+
+// Creates a suspension out of the current state of the state machine.
+// If the task is written correctly, the result should be JSON serializable.
+// So you can store away the suspension and come back to it at a later point,
+// even perhaps on a different machine.
+//
+// The way to resume a suspension is to call the task function like this -
+//      task_fn.call(suspension)
+// You'll typically fill in the '.context' and '.argv' fields appropriately
+// before calling the task function like so.
+//
+StateMachine.prototype.suspension = function (id) {
+    return captureSuspension(this, id);
 };
 
 // StateMachine supports a single global error notification point.

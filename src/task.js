@@ -705,6 +705,66 @@ macro step_state_line {
         };
     }        
 
+    // ### suspend
+    //
+    // The suspend family of forms provide facility to code up workflows that can span multiple machines.
+    // While the "await" family automatically passes a standard nodejs-style callback, the `suspend`
+    // family instead passes a "suspension" that can be serialized and deserialized so that you can
+    // suspend a task on one machine and resume it in another, provided both share the same code base.
+    //
+    // While such across-the-machine suspend/resume is made possible by the suspend form, it is upto
+    // libraries to provide this functionality and the suspend forms merely provide the core facility
+    // required to do this.
+    case { $me $task $state_machine $id { suspend $y ... (); } { $rest ... } } => {
+        var id = unwrapSyntax(#{$id});
+        letstx $id2 = [makeValue(id + 1, #{$id})];
+        return #{
+            $y ... ($state_machine.suspension($id2));
+            break;
+            case $id2:
+            step_state $task $state_machine $id2 { $rest ... }
+        };
+    }
+
+    case { $me $task $state_machine $id { suspend $y ... ($args:expr (,) ...); } { $rest ... } } => {
+        var id = unwrapSyntax(#{$id});
+        letstx $id2 = [makeValue(id + 1, #{$id})];
+        return #{
+            $y ... ($args (,) ... , $state_machine.suspension($id2));
+            break;
+            case $id2:
+            step_state $task $state_machine $id2 { $rest ... }
+        };
+    }
+                                                                
+    case { $me $task $state_machine $id { $x:ident (,) ... <- suspend $y ... (); } { $rest ... } } => {
+        var id = unwrapSyntax(#{$id});
+        letstx $id2 = [makeValue(id + 1, #{$id})], $id3 = [makeValue(id + 2, #{$id})];
+        return #{
+            $y ... ($state_machine.suspension($id2));
+            break;
+            case $id2:
+            var i = 1;
+            $($x = arguments[i++];) ...
+            case $id3:
+                step_state $task $state_machine $id3 { $rest ... }
+        };
+    }
+
+    case { $me $task $state_machine $id { $x:ident (,) ... <- suspend $y ... ($args:expr (,) ...); } { $rest ... } } => {
+        var id = unwrapSyntax(#{$id});
+        letstx $id2 = [makeValue(id + 1, #{$id})], $id3 = [makeValue(id + 2, #{$id})];
+        return #{
+            $y ... ($args (,) ... , $state_machine.suspension($id2));
+            break;
+            case $id2:
+            var i = 1;
+            $($x = arguments[i++];) ...
+            case $id3:
+                step_state $task $state_machine $id3 { $rest ... }
+        };
+    }
+
     // ### Taking values from channels
     //
     // If you have functions that return channels on which they will produce their results,
