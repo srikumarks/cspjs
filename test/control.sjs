@@ -510,4 +510,31 @@ describe('dfvars', function () {
             throw new Error('test');
         });
     });
+
+    describe('cspjsStack', function () {
+        task t1 {
+            await t2();
+        }
+        task t2 {
+            await t3();
+        }
+        task t3 {
+            throw new Error('just for kicks');
+        }
+
+        it('must show nested async calls on error return', task asyncStackTest {
+            catch (e) {
+                assert.deepEqual(e.cspjsStack, [
+                    'asyncStackTest:6',
+                    't1:1',
+                    't2:1',
+                    't3:0'
+                    ]);
+                return true;
+            }
+
+            var someVar = "someValue";
+            await t1();
+        });
+    });
 });

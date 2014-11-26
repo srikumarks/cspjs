@@ -153,10 +153,35 @@ StateMachine.prototype.thenToWithErr = function (id) {
 // will be called asynchronously with two arguments - the error and 
 // the state machine instance within which the error was raised.
 // You can use this, for example, to log all such errors.
+//
+// If this callback is to process an error and err is an instance of
+// Error, then an additional '.cspjsStack' property is added. This
+// property is an array to which more context will get added as the
+// error bubbles up. Each context is expressed in the form -
+//     task_fn_name:<id>
+// where "task_fn_name" is the given name of the async task (so yeah,
+// better name your tasks if you want this to be useful) and "id"
+// gives the state id responsible for the error. In the case of
+// errors raised by "throw", this will refer to the state id immediately
+// before the throw.
+//
+// To locate the specified state, look into the compiled source for
+// a "case <id>:" statement under the task named task_fn_name.
+// Gathering context this way permits errors to be traced even in 
+// reorganized code, where source context may or may not be available,
+// or JS code may not be stored in files at all.
+//
+// The overhead of this error context accumulation occurs only at 
+// error propagation time and almost no cost is added to normal
+// control flow.
 StateMachine.prototype.callback = function (err) {
     this.state.args = Array.prototype.slice.call(arguments);
     this.state.err = err;
     this.state.strict_unwind = true;
+    if (err && err instanceof Error) {
+        err.cspjsStack = err.cspjsStack || [];
+        err.cspjsStack.unshift((this.task_fn.name || 'unnamed') + ':' + (this.state.id-1));
+    }
     err && StateMachine.onerror && nextTick(StateMachine.onerror, err, this);
     nextTick(this.boundUnwind);
 };

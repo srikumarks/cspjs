@@ -2,7 +2,7 @@
     "name": "cspjs",
     "description": "A macro for easing programming with async Javascript APIs",
     "author": "Srikumar",
-    "version": "0.5.5",
+    "version": "0.6.0",
     "main" : "src/task.js",
     "dependencies": {
         "sweet.js" : ">= 0.4.1"
