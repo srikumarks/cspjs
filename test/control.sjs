@@ -146,7 +146,7 @@ describe('errors', function () {
             throw "boom!";
         });
 
-        it('must permit retries', task {
+        it('must permit retries', task retries {
             var tries = 1;
             var arr = [];
             catch (e) {

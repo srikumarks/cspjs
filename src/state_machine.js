@@ -186,6 +186,11 @@ StateMachine.prototype.callback = function (err) {
     nextTick(this.boundUnwind);
 };
 
+StateMachine.prototype.windTo = function (step) {
+    this.state.isUnwinding = false;
+    this.goTo(step);
+};
+
 StateMachine.prototype.unwind = function () {
     if (this.state.unwinding.length > 0) {
         var where = this.state.unwinding.pop();
@@ -194,13 +199,14 @@ StateMachine.prototype.unwind = function () {
             this.restoreStateVars(where.restoreState);
             this.unwind();
         } else if (where.retry) {
-            this.goTo(where.retry);
+            this.windTo(where.retry);
         } else if (where.phi) {
             if (this.state.err || this.state.strict_unwind) {
                 // If we're strictly unwinding, then regular phi control flow doesn't apply.
                 nextTick(this.boundUnwind);
             } else {
-                this.goTo(where.phi);
+                // Normal phi jump.
+                this.windTo(where.phi);
             }
         } else if (where.isError) {
             if (this.state.err) {
@@ -272,6 +278,8 @@ StateMachine.prototype.retry = function () {
 
     // Enter a "no error" state.
     this.state.currentErrorStep = null;
+    this.state.args = Array.prototype.slice.call(arguments);
+    this.state.args.unshift(null);
     this.state.err = null;
     this.state.strict_unwind = true;
 
