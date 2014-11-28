@@ -180,7 +180,7 @@ StateMachine.prototype.callback = function (err) {
     this.state.strict_unwind = true;
     if (err && err instanceof Error) {
         err.cspjsStack = err.cspjsStack || [];
-        err.cspjsStack.unshift((this.task_fn.name || 'unnamed') + ':' + (this.state.id-1));
+        err.cspjsStack.push((this.task_fn.name || 'unnamed') + ':' + (this.state.id-1));
     }
     err && StateMachine.onerror && nextTick(StateMachine.onerror, err, this);
     nextTick(this.boundUnwind);
