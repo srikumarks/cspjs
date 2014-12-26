@@ -525,10 +525,10 @@ describe('dfvars', function () {
         it('must show nested async calls on error return', task asyncStackTest {
             catch (e) {
                 assert.deepEqual(e.cspjsStack, [
-                    'asyncStackTest:6',
-                    't1:1',
+                    't3:0',
                     't2:1',
-                    't3:0'
+                    't1:1',
+                    'asyncStackTest:6',
                     ]);
                 return true;
             }
