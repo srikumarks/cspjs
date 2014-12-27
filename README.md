@@ -149,16 +149,6 @@ task sampleTask(x, y, z) {
     // where 
     //      var Channel = require("cspjs/channel");
 
-    ch := readJSON(handle);
-    in := someAsyncOp(x, y);
-    // This is a "data flow variable bind", which sends the result of the
-    // readJSON operation to the channel. Once the operation completes, 
-    // the channel will perpetually yield the result value no matter how
-    // many times you `.take()` values from it.
-    //
-    // The above binding statement is non-blocking and will result in the
-    // async tasks being "spawned".
-
     chval <- ch.take();
     // This is an explicit way to wait for and take the next value coming
     // on the channel.
@@ -170,6 +160,16 @@ task sampleTask(x, y, z) {
     // Puts the given value on to the channel and waits until it is
     // processed by some reader. You can omit `await`, in which case
     // this task won't wait for the put value to be processed.
+
+    ch := readJSON(handle);
+    in := someAsyncOp(x, y);
+    // This is a "data flow variable bind", which sends the result of the
+    // readJSON operation to the channel. Once the operation completes, 
+    // the channel will perpetually yield the result value no matter how
+    // many times you `.take()` values from it.
+    //
+    // The above binding statement is non-blocking and will result in the
+    // async tasks being "spawned".
 
     await ch in;
     // Prior to this "await", `ch` and `in` are channels. After this
