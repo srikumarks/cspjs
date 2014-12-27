@@ -223,6 +223,17 @@ task sampleTask(x, y, z) {
 }
 ```
 
+### Error tracing
+
+If an error is raised deep within an async sequence of operations and the
+error is allowed to bubble up all the way to the originating task, then the
+error object will contain a `.cspjsStack` property which will contain a trace
+of all the async steps that led to the error ... much like a stack trace.
+
+Note that this tracing is left on in the system and isn't optional, since
+there is no penalty for normal operation when such an error doesn't occur.
+
+
 ## How does it perform?
 
 The macro and libraries are not feature complete and, especially I'd like to
