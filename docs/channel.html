@@ -347,14 +347,14 @@ finish.</p>
     <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>;
 };
 
-<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">ReceivedChannelValue</span><span class="hljs-params">(id, err, value)</span> {</span>
-    <span class="hljs-keyword">this</span>.id = id;
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">ChannelValue</span><span class="hljs-params">(chan, err, value)</span> {</span>
+    <span class="hljs-keyword">this</span>.chan = chan;
     <span class="hljs-keyword">this</span>.err = err;
     <span class="hljs-keyword">this</span>.val = value;
     <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>;
 }
 
-ReceivedChannelValue.prototype.resolve = <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-params">()</span> {</span>
+ChannelValue.prototype.resolve = <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-params">()</span> {</span>
     <span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.err) {
         <span class="hljs-keyword">throw</span> <span class="hljs-keyword">this</span>.err;
     } <span class="hljs-keyword">else</span> {
@@ -379,10 +379,10 @@ channel.</p>
 
             </div>
             
-            <div class="content"><div class='highlight'><pre>Channel.prototype.receive = <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-params">(id)</span> {</span>
+            <div class="content"><div class='highlight'><pre>Channel.prototype.receive = <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-params">()</span> {</span>
     <span class="hljs-keyword">var</span> self = <span class="hljs-keyword">this</span>;
     <span class="hljs-keyword">return</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-params">(err, value)</span> {</span>
-        self.put(<span class="hljs-keyword">new</span> ReceivedChannelValue(id, err, value));
+        self.put(<span class="hljs-keyword">new</span> ChannelValue(self, err, value));
     };
 };</pre></div></div>
             
@@ -402,10 +402,10 @@ the same value, and puts will result in an error.</p>
 
             </div>
             
-            <div class="content"><div class='highlight'><pre>Channel.prototype.resolver = <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-params">(id)</span> {</span>
+            <div class="content"><div class='highlight'><pre>Channel.prototype.resolver = <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-params">()</span> {</span>
     <span class="hljs-keyword">var</span> self = <span class="hljs-keyword">this</span>;
     <span class="hljs-keyword">return</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-params">(err, value)</span> {</span>
-        self.fill(<span class="hljs-keyword">new</span> ReceivedChannelValue(id, err, value));
+        self.fill(<span class="hljs-keyword">new</span> ChannelValue(self, err, value));
     };
 };</pre></div></div>
             
@@ -906,14 +906,7 @@ as well from the elements bound directly.</p>
         end.call(<span class="hljs-keyword">this</span>);
     };
     <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>;
-};
-
-<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">MergedChannelValue</span><span class="hljs-params">(ch, err, value)</span> {</span>
-    <span class="hljs-keyword">this</span>.chan = ch;
-    <span class="hljs-keyword">this</span>.err = err;
-    <span class="hljs-keyword">this</span>.val = value;
-    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>;
-}</pre></div></div>
+};</pre></div></div>
             
         </li>
         
@@ -944,6 +937,7 @@ as the .add() method of the merged channel, to enable addition
 of new channels to the merged stream on the fly. To remove
 a channel from a merged stream, simply send a null value
 to it.</p>
+<p>Breaking change: MergedChannelValue is now ChannelValue.</p>
 
             </div>
             
@@ -953,7 +947,7 @@ to it.</p>
     <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">piper</span><span class="hljs-params">(ch)</span> {</span>
         <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">writer</span><span class="hljs-params">(err, value)</span> {</span>
             <span class="hljs-keyword">if</span> (value !== <span class="hljs-literal">null</span>) {
-                channel.put(<span class="hljs-keyword">new</span> MergedChannelValue(ch, err, value), reader);
+                channel.put(<span class="hljs-keyword">new</span> ChannelValue(ch, err, value), reader);
             } <span class="hljs-keyword">else</span> {</pre></div></div>
             
         </li>
@@ -969,7 +963,7 @@ to it.</p>
 
             </div>
             
-            <div class="content"><div class='highlight'><pre>                channel.put(<span class="hljs-keyword">new</span> MergedChannelValue(ch, <span class="hljs-literal">null</span>, <span class="hljs-literal">null</span>));
+            <div class="content"><div class='highlight'><pre>                channel.put(<span class="hljs-keyword">new</span> ChannelValue(ch, <span class="hljs-literal">null</span>, <span class="hljs-literal">null</span>));
             }
         }
         <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">reader</span><span class="hljs-params">(err, value)</span> {</span>

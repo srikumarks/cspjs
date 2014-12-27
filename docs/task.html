@@ -111,6 +111,15 @@ in JS - in the CSP style of the <code>Haskell</code>, <code>Erlang</code> and <c
         };
     }
 
+    case { $_ () { $body ... } } =&gt; {
+        letstx $callback = [makeIdent("callback", #{$_})];
+        return #{
+            (function ($callback) {
+                setup_state_machine $_ $callback ($callback) { $body ... }
+            })
+        };
+    }
+
     case { $_ ($x:ident (,) ...) { $body ... } } =&gt; {
         letstx $callback = [makeIdent("callback", #{$_})];
         return #{
@@ -119,6 +128,15 @@ in JS - in the CSP style of the <code>Haskell</code>, <code>Erlang</code> and <c
             })
         };
     }
+
+    case { $_ $taskname:ident() { $body ... } } =&gt; {
+        letstx $callback = [makeIdent("callback", #{$_})];
+        return #{
+            function $taskname($callback) {
+                setup_state_machine $_ $callback ($callback) { $body ... }
+            }
+        };
+    }   
 
     case { $_ $taskname:ident($x:ident (,) ...) { $body ... } } =&gt; {
         letstx $callback = [makeIdent("callback", #{$_})];
@@ -413,7 +431,7 @@ macro declare_varset {
 }
 
 macro declare_state_variables_step {
-	rule { $task $state_machine $fin ($v ...) { $x:ident &lt;= $y ... ; } { $rest ... } } =&gt; {
+	rule { $task $state_machine $fin ($v ...) { $x:ident := $y ... ; } { $rest ... } } =&gt; {
 		declare_state_variables $task $state_machine $fin ($x $v ...) { $rest ... }
 	}
 	rule { $task $state_machine $fin ($v ...) { $x:ident &lt;- $y ... ; } { $rest ... } } =&gt; {
@@ -571,8 +589,8 @@ macro count_states {
     rule { $task ($n ...) { <span class="hljs-keyword">catch</span> ($e ...) { $handler ... } $rest ... } } =&gt; {
         count_states $task (<span class="hljs-number">2</span> $n ...) { $handler ... $rest ... }
     }
-    rule { $task $n  { <span class="hljs-keyword">switch</span> ($x ...) { $(<span class="hljs-keyword">case</span> $ix:lit (,) ... : { $body ... }) ... } $rest ... } } =&gt; {
-        count_states $task $n { $($body ... phi $state_machine ;) ... $rest ... }
+    rule { $task ($n ...)  { <span class="hljs-keyword">switch</span> ($x ...) { $(<span class="hljs-keyword">case</span> $ix:lit (,) ... : { $body ... }) ... } $rest ... } } =&gt; {
+        count_states $task (<span class="hljs-number">1</span> $n ...) { $($body ... phi $state_machine ;) ... $rest ... }
     }
     rule { $task $n { $step ... ; $rest ... } } =&gt; {
         count_states_line $task $n { $step ... ; } { $rest ... }
@@ -612,10 +630,10 @@ count_states macro itself, but only this separation works correctly!</p>
     rule { $task ($n ...) { $x:ident (,) ... &lt;&lt;- $y ... ($args:expr (,) ...); } { $rest ... } } =&gt; {
         count_states $task (<span class="hljs-number">2</span> $n ...) { $rest ... }
     }
-    rule { $task ($n ...) { $x:ident &lt;= $y ... (); } { $rest ... } } =&gt; {
+    rule { $task ($n ...) { $x:ident := $y ... (); } { $rest ... } } =&gt; {
         count_states $task (<span class="hljs-number">1</span> $n ...) { $rest ... }
     }
-    rule { $task ($n ...) { $x:ident &lt;= $y ... ($args:expr (,) ...); } { $rest ... } } =&gt; {
+    rule { $task ($n ...) { $x:ident := $y ... ($args:expr (,) ...); } { $rest ... } } =&gt; {
         count_states $task (<span class="hljs-number">1</span> $n ...) { $rest ... }
     }
     rule { $task ($n ...) { $step ... ; } { $rest ... } } =&gt; {
@@ -1069,7 +1087,7 @@ has the same <code>take</code> protocol as a channel can be used.</p>
 </code></pre><p>This block and the following are basically the same. The problem is that I don’t know
 how to insert the additional callback argument with a preceding comma in one
 case and without one in the other.</p>
-<p>If you use ‘&lt;=’ instead of ‘&lt;-‘, the operation is started off in parallel and
+<p>If you use ‘:=’ instead of ‘&lt;-‘, the operation is started off in parallel and
 the variable on the LHS (only one allowed in this case) will be bound to a new channel
 on which the result can be received. You can subsequently do “await x;” to cause
 x to be bound to the value received on the new channel, and further statements
@@ -1136,23 +1154,23 @@ If any errors occur, an exception will be raised. </p>
         };
     }
 
-    <span class="hljs-keyword">case</span> { $me $task $state_machine $id { $x:ident &lt;= $y ... (); } { $rest ... } } =&gt; {
+    <span class="hljs-keyword">case</span> { $me $task $state_machine $id { $x:ident := $y ... (); } { $rest ... } } =&gt; {
         <span class="hljs-keyword">var</span> id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + <span class="hljs-number">1</span>, #{$id})];
         <span class="hljs-keyword">return</span> #{
             $x = $x || $state_machine.channel();
-            $y ... ($x.resolver(<span class="hljs-number">0</span>));
+            $y ... ($x.resolver());
             <span class="hljs-keyword">case</span> $id2:
                 step_state $task $state_machine $id2 { $rest ... }
         };
     }
 
-    <span class="hljs-keyword">case</span> { $me $task $state_machine $id { $x:ident &lt;= $y ... ($args:expr (,) ...); } { $rest ... } } =&gt; {
+    <span class="hljs-keyword">case</span> { $me $task $state_machine $id { $x:ident := $y ... ($args:expr (,) ...); } { $rest ... } } =&gt; {
         <span class="hljs-keyword">var</span> id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + <span class="hljs-number">1</span>, #{$id})];
         <span class="hljs-keyword">return</span> #{
             $x = $x || $state_machine.channel();
-            $y ... ($args (,) ... , $x.resolver(<span class="hljs-number">0</span>));
+            $y ... ($args (,) ... , $x.resolver());
             <span class="hljs-keyword">case</span> $id2:
                 step_state $task $state_machine $id2 { $rest ... }
         };
