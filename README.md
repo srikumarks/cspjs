@@ -126,6 +126,22 @@ task sampleTask(x, y, z) {
 
     // (If none of the switch cases match, that's treated as an error.)
 
+    while (someCondition(x,y)) {
+        // While loops are also supported, with async statements
+        // permitted in the block. 
+        //
+        // TODO: No "break;" statement as of this version.
+    }
+
+    var arr = ["one", "two", "three"];
+    for (var i = 0; i < arr.length; ++i) {
+        // For loops are also supported and they expand
+        // into the `while` form.
+
+        content <- fs.readFile(arr[i] + '.txt', {encoding: 'utf8'});
+        // .. so yes you can write loops with async code too.
+    }
+
     chan ch, in, out; 
     // Declares and initializes channel objects.
     // This is equivalent to -
