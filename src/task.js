@@ -46,6 +46,15 @@ macro task {
         };
     }
 
+    case { $_ () { $body ... } } => {
+        letstx $callback = [makeIdent("callback", #{$_})];
+        return #{
+            (function ($callback) {
+                setup_state_machine $_ $callback ($callback) { $body ... }
+            })
+        };
+    }
+
     case { $_ ($x:ident (,) ...) { $body ... } } => {
         letstx $callback = [makeIdent("callback", #{$_})];
         return #{
@@ -54,6 +63,15 @@ macro task {
             })
         };
     }
+
+    case { $_ $taskname:ident() { $body ... } } => {
+        letstx $callback = [makeIdent("callback", #{$_})];
+        return #{
+            function $taskname($callback) {
+                setup_state_machine $_ $callback ($callback) { $body ... }
+            }
+        };
+    }   
 
     case { $_ $taskname:ident($x:ident (,) ...) { $body ... } } => {
         letstx $callback = [makeIdent("callback", #{$_})];
