@@ -7,7 +7,8 @@ by [Promises/A+][] or even generators.
 
 Apart from tasks and channels, cspjs attempts at a saner and more expressive
 error handling mechanism than the traditional try-catch-finally model.  See
-[blog post][errman] describing the error management scheme in detail.
+[blog post][errman] and [follow up][errman2] describing the error management
+scheme in detail.
 
 [CSP]: https://en.wikipedia.org/wiki/Communicating_sequential_processes
 
@@ -343,6 +344,7 @@ entirely.
 [task]: https://github.com/srikumarks/cspjs/blob/master/src/task.js
 [Channel]: https://github.com/srikumarks/cspjs/blob/master/src/channel.js
 [errman]: http://sriku.org/blog/2014/02/11/bye-bye-js-promises/
+[errman2]: http://sriku.org/blog/2014/10/11/errors-recovery-and-async-code-flow/ 
 [Node.js]: http://nodejs.org
 
 
