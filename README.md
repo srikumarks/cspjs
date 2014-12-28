@@ -77,7 +77,7 @@ callback's first "error" argument will be the one set to `42`.
 3. When a task function is called, it will begin executing only on the next IO
    turn.
 
-4. As task will always call the passed callback only once.
+4. A task will always call the passed callback once and once only.
 
 ### Sample code illustrating various features
 
@@ -105,11 +105,11 @@ task sampleTask(x, y, z) {
     // instead of "bubbling up" errors.
 
     if (!err && json) {
-        // Regular if expressions just work. Bodies can themselves
+        // "if" statements work as usual. Bodies can themselves
         // contain async statements.
     } else {
         // ... and so does `else`. Note that as of this writing,
-        // the if-then-else-if cascade isn't implemented.
+        // the if-then-else-if cascade isn't supported.
     }
 
     switch (json.type) {
@@ -192,7 +192,9 @@ task sampleTask(x, y, z) {
     throw new Error("harumph!");
     // throwing an error that isnt caught within the task will result in
     // the error propagating asynchronously to the task initiator via the
-    // provided callback function.
+    // provided callback function. The throw ends up being a no-op if the
+    // thrown value is null or undefined, since the convention with the
+    // callback signature is that err === null means no error.
 
     catch (e) {
         // You can handle all errors thrown by statements following this
@@ -202,15 +204,17 @@ task sampleTask(x, y, z) {
         // immediately following this catch block.
 
         // As always, all blocks, including catch blocks, support async statements.
-        // Catch blocks are scoped to the inner-most block.
+        // A catch block is scoped to the block that contains it.
     }
 
     finally {
         // Finally blocks perform cleanup operations on error or normal returns.
-        // Finally blocks (as are its statement forms) are scoped to the 
-        // blocks that contain them.
+        // A finally block (as is its statement forms) is scoped to the 
+        // block that contains it.
         //
         // WARNING: Though you can return or throw here, you really shouldn't.
+        // If your cleanup code raises errors, then you cannot reason about
+        // error behaviour.
         handle.close();
     }
 
@@ -225,19 +229,20 @@ task sampleTask(x, y, z) {
 
 ### Error tracing
 
-If an error is raised deep within an async sequence of operations and the
-error is allowed to bubble up all the way to the originating task, then the
-error object will contain a `.cspjsStack` property which will contain a trace
-of all the async steps that led to the error ... much like a stack trace.
+If an error is raised deep within an async sequence of operations and the error
+is allowed to bubble up to one of the originating tasks, then the error object
+will contain a `.cspjsStack` property which will contain a trace of all the
+async steps that led to the error ... much like a stack trace.
 
-Note that this tracing is left on in the system and isn't optional, since
-there is no penalty for normal operation when such an error doesn't occur.
+Note that this tracing is always turned ON in the system and isn't optional,
+since there is no penalty for normal operation when such an error doesn't
+occur.
 
 
 ## How does it perform?
 
 The macro and libraries are not feature complete and, especially I'd like to
-add some form of tracing. However, it mostly works and seems to marginally beat
+add more tracing. However, it mostly works and seems to marginally beat
 bluebird in performance while having the same degree of brevity as the
 generator based code. The caveat is that the code is evolving and performance
 may fluctuate a bit as some features are added. (I'll try my best to not
