@@ -104,6 +104,10 @@ task sampleTask(x, y, z) {
     // Regular state variable declarations. Note that uninitialized var statements
     // are illegal.
 
+    console.log("hello from cspjs!");
+    // Normal JS statements ending with a semicolon are treated as synchronous.
+    // Note that the semicolon is not optional.
+
     handle <- fs.open("some_file.txt", {encoding: 'utf8'});
     // `handle` is automatically declared to be a state variable and will be bound
     // to the result of the asynchronous file open call. All following statements will 
