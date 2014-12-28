@@ -14,18 +14,18 @@ scheme in detail.
 
 ### Contents
 
-1. [How do I install it?](#how-do-i-install-it)
-2. [How do I use it?](#how-do-i-use-it)
+1. [Installation](#installation)
+2. [Using the task macro](#using-the-task-macro)
 3. [Guarantees provided by tasks](#guarantees-provided-by-tasks)
 4. [Sample code illustrating various features](#sample-code-illustrating-various-features)
 5. [Error tracing](#error-tracing)
-6. [How does it perform?](#how-does-it-perform)
+6. [Performance](#performance)
    1. [doxbee-sequential](#doxbee-sequential)
    2. [doxbee-sequential-errors](#doxbee-sequential-errors)
    3. [madeup-parallel](#madeup-parallel)
 7. [History](#history)
 
-## How do I install it?
+## Installation
 ]
 1. You need to have [sweetjs][] installed with `npm install -g sweet.js`
 2. Install cspjs using npm like this - `npm install cspjs` to get it into your `node_modules` directory.
@@ -44,7 +44,7 @@ scheme in detail.
 
 For complete documentation, see the docco generated docs in `docs/*.html`.
 
-## How do I use it?
+## Using the task macro
 
 `cspjs` provides a single macro called `task` that is similar to `function` in
 form, but interprets certain statements as asynchronous operations. Different
@@ -253,7 +253,7 @@ since there is no penalty for normal operation when such an error doesn't
 occur.
 
 
-## How does it perform?
+## Performance
 
 The macro and libraries are not feature complete and, especially I'd like to
 add more tracing. However, it mostly works and seems to marginally beat
