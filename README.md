@@ -12,8 +12,21 @@ scheme in detail.
 
 [CSP]: https://en.wikipedia.org/wiki/Communicating_sequential_processes
 
-## How do I install it?
+### Contents
 
+1. [How do I install it?](#how-do-i-install-it)
+2. [How do I use it?](#how-do-i-use-it)
+3. [Guarantees provided by tasks](#guarantees-provided-by-tasks)
+4. [Sample code illustrating various features](#sample-code-illustrating-various-features)
+5. [Error tracing](#error-tracing)
+6. [How does it perform?](#how-does-it-perform)
+   1. [doxbee-sequential](#doxbee-sequential)
+   2. [doxbee-sequential-errors](#doxbee-sequential-errors)
+   3. [madeup-parallel](#madeup-parallel)
+7. [History](#history)
+
+## How do I install it?
+]
 1. You need to have [sweetjs][] installed with `npm install -g sweet.js`
 2. Install cspjs using npm like this - `npm install cspjs` to get it into your `node_modules` directory.
 3. To compile a `.sjs` file that uses the `task` macro, do -
@@ -62,7 +75,7 @@ function greet(name, callback) {
 ```
 
 .. except that upon calling, `greet` will execute on the next IO turn instead
-of immediately. If `greet` did a `throw 42;` instead of `return 42;`, then the
+of i]mediately. If `greet` did a `throw 42;` instead of `return 42;`, then the
 callback's first "error" argument will be the one set to `42`.
 
 ### Guarantees provided by tasks
