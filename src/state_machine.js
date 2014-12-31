@@ -440,7 +440,7 @@ StateMachine.prototype.jumpTable = function (id, cases, blockSizes) {
 
     console.assert(cases.length === blockSizes.length);
 
-    return this.task_fn.cachedJumpTable[id] = new JumpTable(id, cases, blockSizes);
+    return (this.task_fn.cachedJumpTable[id] = new JumpTable(id, cases, blockSizes));
 };
 
 StateMachine.prototype.channel = function () {

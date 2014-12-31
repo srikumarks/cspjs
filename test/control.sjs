@@ -429,15 +429,15 @@ describe('dfvars', function () {
         setTimeout(callback, 10, null, msg);
     }
 
-    describe('<=', function () {
+    describe(':=', function () {
         it('must declare and initialize a channel variable', task {
-            x <= greet('hello');
+            x := greet('hello');
             assert.ok(x instanceof Channel);
         });
 
         it('must run in parallel', task {
-            x <= greet('one');
-            y <= greet('two');
+            x := greet('one');
+            y := greet('two');
             assert.ok(x instanceof Channel);
             assert.ok(y instanceof Channel);
             await x y;
@@ -447,10 +447,10 @@ describe('dfvars', function () {
 
         it('must also work across tasks', task {
             var t1 = task (ch1, ch2) {
-                ch1 <= greet('hello');
+                ch1 := greet('hello');
                 await ch1;
                 assert.equal(ch1, 'hello');
-                ch2 <= greet('world');
+                ch2 := greet('world');
                 await ch2;
                 assert.equal(ch2, 'world');
             };
@@ -467,10 +467,10 @@ describe('dfvars', function () {
     describe('chan', function () {
         it('must declare channels', task {
             var t1 = task (ch1, ch2) {
-                ch1 <= greet('hello');
+                ch1 := greet('hello');
                 await ch1;
                 assert.equal(ch1, 'hello');
-                ch2 <= greet('world');
+                ch2 := greet('world');
                 await ch2;
                 assert.equal(ch2, 'world');
             };
@@ -525,10 +525,10 @@ describe('dfvars', function () {
         it('must show nested async calls on error return', task asyncStackTest {
             catch (e) {
                 assert.deepEqual(e.cspjsStack, [
-                    'asyncStackTest:6',
-                    't1:1',
+                    't3:0',
                     't2:1',
-                    't3:0'
+                    't1:1',
+                    'asyncStackTest:6',
                     ]);
                 return true;
             }

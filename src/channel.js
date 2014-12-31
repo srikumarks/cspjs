@@ -190,14 +190,14 @@ Channel.prototype.bind = function (klass, options) {
     return this;
 };
 
-function ReceivedChannelValue(id, err, value) {
-    this.id = id;
+function ChannelValue(chan, err, value) {
+    this.chan = chan;
     this.err = err;
     this.val = value;
     return this;
 }
 
-ReceivedChannelValue.prototype.resolve = function () {
+ChannelValue.prototype.resolve = function () {
     if (this.err) {
         throw this.err;
     } else {
@@ -210,10 +210,10 @@ ReceivedChannelValue.prototype.resolve = function () {
 // "id" exists to identify the one producing the value.
 // The "id", "err" and "val" are all available on the
 // channel.
-Channel.prototype.receive = function (id) {
+Channel.prototype.receive = function () {
     var self = this;
     return function (err, value) {
-        self.put(new ReceivedChannelValue(id, err, value));
+        self.put(new ChannelValue(self, err, value));
     };
 };
 
@@ -221,10 +221,10 @@ Channel.prototype.receive = function (id) {
 // with the value received on the callback. Once a value
 // is received, all subsequent take operations will give
 // the same value, and puts will result in an error.
-Channel.prototype.resolver = function (id) {
+Channel.prototype.resolver = function () {
     var self = this;
     return function (err, value) {
-        self.fill(new ReceivedChannelValue(id, err, value));
+        self.fill(new ChannelValue(self, err, value));
     };
 };
 
@@ -551,13 +551,6 @@ Channel.prototype.listen = function (domElement, eventName) {
     return this;
 };
 
-function MergedChannelValue(ch, err, value) {
-    this.chan = ch;
-    this.err = err;
-    this.val = value;
-    return this;
-}
-
 // Makes a new channel that receives the values put into
 // all the given channels (which is an array of channels).
 // The value produced by a merged channel is a wrapper object
@@ -579,16 +572,18 @@ function MergedChannelValue(ch, err, value) {
 // of new channels to the merged stream on the fly. To remove
 // a channel from a merged stream, simply send a null value
 // to it.
+//
+// Breaking change: MergedChannelValue is now ChannelValue.
 Channel.merge = function (channels) {
     var channel = new Channel();
 
     function piper(ch) {
         function writer(err, value) {
             if (value !== null) {
-                channel.put(new MergedChannelValue(ch, err, value), reader);
+                channel.put(new ChannelValue(ch, err, value), reader);
             } else {
                 // Indicate that the channel is finished. The reader can discard this.
-                channel.put(new MergedChannelValue(ch, null, null));
+                channel.put(new ChannelValue(ch, null, null));
             }
         }
         function reader(err, value) {

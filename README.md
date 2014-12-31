@@ -7,11 +7,25 @@ by [Promises/A+][] or even generators.
 
 Apart from tasks and channels, cspjs attempts at a saner and more expressive
 error handling mechanism than the traditional try-catch-finally model.  See
-[blog post][errman] describing the error management scheme in detail.
+[blog post][errman] and [follow up][errman2] describing the error management
+scheme in detail.
 
 [CSP]: https://en.wikipedia.org/wiki/Communicating_sequential_processes
 
-## How do I use it?
+### Contents
+
+1. [Installation](#installation)
+2. [Using the task macro](#using-the-task-macro)
+3. [Guarantees provided by tasks](#guarantees-provided-by-tasks)
+4. [Sample code illustrating various features](#sample-code-illustrating-various-features)
+5. [Error tracing](#error-tracing)
+6. [Performance](#performance)
+   1. [doxbee-sequential](#doxbee-sequential)
+   2. [doxbee-sequential-errors](#doxbee-sequential-errors)
+   3. [madeup-parallel](#madeup-parallel)
+7. [History](#history)
+
+## Installation
 
 1. You need to have [sweetjs][] installed with `npm install -g sweet.js`
 2. Install cspjs using npm like this - `npm install cspjs` to get it into your `node_modules` directory.
@@ -30,10 +44,230 @@ error handling mechanism than the traditional try-catch-finally model.  See
 
 For complete documentation, see the docco generated docs in `docs/*.html`.
 
-## How does it perform?
+## Using the task macro
+
+`cspjs` provides a single macro called `task` that is similar to `function` in
+form, but interprets certain statements as asynchronous operations. Different
+tasks may communicate with each other via `Channel` objects provided by
+`cspjs/channel`.  
+
+Any NodeJS style async operation with a `function (err, result) {..}` callback
+as its last argument can be conveniently used within `task`, which itself
+compiles into a function of that form. 
+
+Below is a simple hello world -
+
+```js
+task greet(name) {
+    console.log("Hello", name);
+    return 42;
+}
+```
+
+The above task is equivalent to the following and compiles into a function with
+exactly the same signature as the below function -
+
+```js
+function greet(name, callback) {
+    console.log("Hello", name);
+    callback(null, 42);
+}
+```
+
+.. except that upon calling, `greet` will execute on the next IO turn instead
+of i]mediately. If `greet` did a `throw 42;` instead of `return 42;`, then the
+callback's first "error" argument will be the one set to `42`.
+
+### Guarantees provided by tasks
+
+1. A `task`, after compilation by cspjs, becomes an ordinary function which
+   accepts an extra final argument that is expected to be a callback following
+   the NodeJS convention of `function (err, result) {...}`.
+
+2. A task will communicate normal or error return only via the `callback`
+   argument.  In particular, it is guaranteed to never throw .. in the normal
+   Javascript sense. 
+
+3. When a task function is called, it will begin executing only on the next IO
+   turn.
+
+4. A task will always call the passed callback once and once only.
+
+### Sample code illustrating various features
+
+```js
+task sampleTask(x, y, z) {
+    // "sampleTask" will compile into a function with the signature -
+    //    function sampleTask(x, y, z, callback) { ... }
+
+    var dist = Math.sqrt(x * x + y * y + z * z);
+    // Regular state variable declarations. Note that uninitialized var statements
+    // are illegal.
+
+    console.log("hello from cspjs!");
+    // Normal JS statements ending with a semicolon are treated as synchronous.
+    // Note that the semicolon is not optional.
+
+    handle <- fs.open("some_file.txt", {encoding: 'utf8'});
+    // `handle` is automatically declared to be a state variable and will be bound
+    // to the result of the asynchronous file open call. All following statements will 
+    // execute only after this async open succeeds. You can use all of NodeJS's
+    // async APIs with cspjs, without any wrapper code.
+    //
+    // If fs.open failed for some reason, the error will "bubble up" and the
+    // following statements won't be executed at all. Read on to find out
+    // more about error handling.
+
+    err, json <<- readJSON(handle);
+    // You can use <<- instead of <- to explicitly get at the error value
+    // instead of "bubbling up" errors.
+
+    if (!err && json) {
+        // "if" statements work as usual. Bodies can themselves
+        // contain async statements.
+    } else {
+        // ... and so does `else`. Note that as of this writing,
+        // the if-then-else-if cascade isn't supported.
+    }
+
+    switch (json.type) {
+        // Switch also just works, except that there is no fall through
+        // and the braces after the case parts are mandatory .. and you
+        // don't need break statements (which don't exist in cspjs).
+        case "number": {
+            // Async statements permitted here too.
+        }
+        case "string", "object": {
+            // You can match against multiple values.
+        }
+    }
+
+    // (If none of the switch cases match, that's treated as an error.)
+
+    while (someCondition(x,y)) {
+        // While loops are also supported, with async statements
+        // permitted in the block. 
+        //
+        // TODO: No "break;" statement as of this version.
+    }
+
+    var arr = ["one", "two", "three"];
+    for (var i = 0; i < arr.length; ++i) {
+        // For loops are also supported and they expand
+        // into the `while` form.
+
+        content <- fs.readFile(arr[i] + '.txt', {encoding: 'utf8'});
+        // .. so yes you can write loops with async code too.
+    }
+
+    chan ch, in, out; 
+    // Declares and initializes channel objects.
+    // This is equivalent to -
+    //     var ch = new Channel(), in = new Channel(), out = new Channel();
+    // where 
+    //      var Channel = require("cspjs/channel");
+
+    chval <- ch.take();
+    // This is an explicit way to wait for and take the next value coming
+    // on the channel.
+
+    chval <- chan ch;
+    // This is syntactic sugar for the previous explicit take().
+
+    await out.put(42);
+    // Puts the given value on to the channel and waits until it is
+    // processed by some reader. You can omit `await`, in which case
+    // this task won't wait for the put value to be processed.
+    //
+    // This form of "await" is syntactic sugar for async steps which
+    // you need to perform for their side effects - i.e. you don't
+    // need any result from the async step. The above await is 
+    // equivalent to -
+    //      <- out.put(42);
+    // .. where there is no variable to the left of the "<-".
+
+    ch := readJSON(handle);
+    in := someAsyncOp(x, y);
+    // This is a "data flow variable bind", which sends the result of the
+    // readJSON operation to the channel. Once the operation completes, 
+    // the channel will perpetually yield the result value no matter how
+    // many times you `.take()` values from it.
+    //
+    // The above binding statement is non-blocking and will result in the
+    // async tasks being "spawned".
+
+    await ch in;
+    // Prior to this "await", `ch` and `in` are channels. After this
+    // await, they become bound to the actual value received on those
+    // channels. This works no matter which tasks these "channel variables"
+    // occur in and in which tasks the fulfillment of the channels
+    // occurs. In effect, this facility mimics promises. (TODO: also
+    // interop with promise APIs using this mechanism).
+    //
+    // In particular, you can spawn a task passing in these channels
+    // as arguments. If the task binds the channels using `:=`, then
+    // such an await in this task will receive the fulfilled values.
+    //
+    // If some error occurs, then it is bubbled up from this await point
+    // and not from the original bind point. This is because if you don't
+    // need the value on the channel, there is no reason for you to 
+    // bother with errors in that process as well (as far as I can think 
+    // of it).
+
+    throw new Error("harumph!");
+    // throwing an error that isnt caught within the task will result in
+    // the error propagating asynchronously to the task initiator via the
+    // provided callback function. The throw ends up being a no-op if the
+    // thrown value is null or undefined, since the convention with the
+    // callback signature is that err === null means no error.
+
+    catch (e) {
+        // You can handle all errors thrown by statements following this
+        // catch block here. If you do nothing, the error gets automatically
+        // rethrown. If you handle it successfully, you either `return` a
+        // value from here, or `retry;`, which results in the statements
+        // immediately following this catch block.
+
+        // As always, all blocks, including catch blocks, support async statements.
+        // A catch block is scoped to the block that contains it.
+    }
+
+    finally {
+        // Finally blocks perform cleanup operations on error or normal returns.
+        // A finally block (as is its statement forms) is scoped to the 
+        // block that contains it.
+        //
+        // WARNING: Though you can return or throw here, you really shouldn't.
+        // If your cleanup code raises errors, then you cannot reason about
+        // error behaviour.
+        handle.close();
+    }
+
+    finally handle.close(); // This statement form of finally is also supported.
+
+    return x * x, y * y, z * z;
+    // Return statements can return multiple values, unlike throw.
+    // If no return statement is included in a task, it is equivalent to
+    // placing a `return true;` at the end.
+}
+```
+
+### Error tracing
+
+If an error is raised deep within an async sequence of operations and the error
+is allowed to bubble up to one of the originating tasks, then the error object
+will contain a `.cspjsStack` property which will contain a trace of all the
+async steps that led to the error ... much like a stack trace.
+
+Note that this tracing is always turned ON in the system and isn't optional,
+since there is no penalty for normal operation when such an error doesn't
+occur.
+
+
+## Performance
 
 The macro and libraries are not feature complete and, especially I'd like to
-add some form of tracing. However, it mostly works and seems to marginally beat
+add more tracing. However, it mostly works and seems to marginally beat
 bluebird in performance while having the same degree of brevity as the
 generator based code. The caveat is that the code is evolving and performance
 may fluctuate a bit as some features are added. (I'll try my best to not
@@ -134,6 +368,7 @@ entirely.
 [task]: https://github.com/srikumarks/cspjs/blob/master/src/task.js
 [Channel]: https://github.com/srikumarks/cspjs/blob/master/src/channel.js
 [errman]: http://sriku.org/blog/2014/02/11/bye-bye-js-promises/
+[errman2]: http://sriku.org/blog/2014/10/11/errors-recovery-and-async-code-flow/ 
 [Node.js]: http://nodejs.org
 
 

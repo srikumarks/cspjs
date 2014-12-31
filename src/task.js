@@ -46,6 +46,15 @@ macro task {
         };
     }
 
+    case { $_ () { $body ... } } => {
+        letstx $callback = [makeIdent("callback", #{$_})];
+        return #{
+            (function ($callback) {
+                setup_state_machine $_ $callback ($callback) { $body ... }
+            })
+        };
+    }
+
     case { $_ ($x:ident (,) ...) { $body ... } } => {
         letstx $callback = [makeIdent("callback", #{$_})];
         return #{
@@ -54,6 +63,15 @@ macro task {
             })
         };
     }
+
+    case { $_ $taskname:ident() { $body ... } } => {
+        letstx $callback = [makeIdent("callback", #{$_})];
+        return #{
+            function $taskname($callback) {
+                setup_state_machine $_ $callback ($callback) { $body ... }
+            }
+        };
+    }   
 
     case { $_ $taskname:ident($x:ident (,) ...) { $body ... } } => {
         letstx $callback = [makeIdent("callback", #{$_})];
@@ -272,7 +290,7 @@ macro declare_varset {
 }
 
 macro declare_state_variables_step {
-	rule { $task $state_machine $fin ($v ...) { $x:ident <= $y ... ; } { $rest ... } } => {
+	rule { $task $state_machine $fin ($v ...) { $x:ident := $y ... ; } { $rest ... } } => {
 		declare_state_variables $task $state_machine $fin ($x $v ...) { $rest ... }
 	}
 	rule { $task $state_machine $fin ($v ...) { $x:ident <- $y ... ; } { $rest ... } } => {
@@ -413,10 +431,10 @@ macro count_states_line {
     rule { $task ($n ...) { $x:ident (,) ... <<- $y ... ($args:expr (,) ...); } { $rest ... } } => {
         count_states $task (2 $n ...) { $rest ... }
     }
-    rule { $task ($n ...) { $x:ident <= $y ... (); } { $rest ... } } => {
+    rule { $task ($n ...) { $x:ident := $y ... (); } { $rest ... } } => {
         count_states $task (1 $n ...) { $rest ... }
     }
-    rule { $task ($n ...) { $x:ident <= $y ... ($args:expr (,) ...); } { $rest ... } } => {
+    rule { $task ($n ...) { $x:ident := $y ... ($args:expr (,) ...); } { $rest ... } } => {
         count_states $task (1 $n ...) { $rest ... }
     }
     rule { $task ($n ...) { $step ... ; } { $rest ... } } => {
@@ -807,7 +825,7 @@ macro step_state_line {
     // how to insert the additional callback argument with a preceding comma in one
     // case and without one in the other.
     //
-    // If you use '<=' instead of '<-', the operation is started off in parallel and
+    // If you use ':=' instead of '<-', the operation is started off in parallel and
     // the variable on the LHS (only one allowed in this case) will be bound to a new channel
     // on which the result can be received. You can subsequently do "await x;" to cause
     // x to be bound to the value received on the new channel, and further statements
@@ -871,23 +889,23 @@ macro step_state_line {
         };
     }
 
-    case { $me $task $state_machine $id { $x:ident <= $y ... (); } { $rest ... } } => {
+    case { $me $task $state_machine $id { $x:ident := $y ... (); } { $rest ... } } => {
         var id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + 1, #{$id})];
         return #{
             $x = $x || $state_machine.channel();
-            $y ... ($x.resolver(0));
+            $y ... ($x.resolver());
             case $id2:
                 step_state $task $state_machine $id2 { $rest ... }
         };
     }
 
-    case { $me $task $state_machine $id { $x:ident <= $y ... ($args:expr (,) ...); } { $rest ... } } => {
+    case { $me $task $state_machine $id { $x:ident := $y ... ($args:expr (,) ...); } { $rest ... } } => {
         var id = unwrapSyntax(#{$id});
         letstx $id2 = [makeValue(id + 1, #{$id})];
         return #{
             $x = $x || $state_machine.channel();
-            $y ... ($args (,) ... , $x.resolver(0));
+            $y ... ($args (,) ... , $x.resolver());
             case $id2:
                 step_state $task $state_machine $id2 { $rest ... }
         };
