@@ -33,6 +33,26 @@ function Suspension(fn, vars, id, argv, context, next) {
     this.next = next;
 }
 
+Suspension.prototype.toJSON = function () {
+    return {
+        _type: 'cspjs.suspension',
+        fn: this.fn,
+        vars: this.vars,
+        id: this.id,
+        argv: this.argv,
+        context: this.context,
+        next: this.next
+    };
+};
+
+Suspension.fromJSON = function (json) {
+    if (!json || json._type !== 'cspjs.Suspension') {
+        throw new Error('Invalid suspension');
+    }
+
+    return new Suspension(json.fn, json.vars, json.id, json.argv, json.context, json.next);
+};
+
 function captureSuspension(state_machine, id) {
     var fn = state_machine.task_fn._cspjs_registry_key;
     if (!fn) {
