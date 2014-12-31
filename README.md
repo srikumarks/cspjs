@@ -178,6 +178,13 @@ task sampleTask(x, y, z) {
     // Puts the given value on to the channel and waits until it is
     // processed by some reader. You can omit `await`, in which case
     // this task won't wait for the put value to be processed.
+    //
+    // This form of "await" is syntactic sugar for async steps which
+    // you need to perform for their side effects - i.e. you don't
+    // need any result from the async step. The above await is 
+    // equivalent to -
+    //      <- out.put(42);
+    // .. where there is no variable to the left of the "<-".
 
     ch := readJSON(handle);
     in := someAsyncOp(x, y);
