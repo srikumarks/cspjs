@@ -46,7 +46,7 @@ Suspension.prototype.toJSON = function () {
 };
 
 Suspension.fromJSON = function (json) {
-    if (!json || json._type !== 'cspjs.Suspension') {
+    if (!json || json._type !== 'cspjs.suspension') {
         throw new Error('Invalid suspension');
     }
 
