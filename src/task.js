@@ -183,6 +183,11 @@ macro task {
 // variables and declare them up front. This simplifies the need for 
 // local var declarations in the generated JS ... which are not really
 // local anyway.
+//
+// `step_state` is the real work horse, which
+// walks through each statement in the task
+// body and compiles it to a single step in
+// the state machine.
 
 macro setup_state_machine {
     rule { $task $callback $formals { $body ... } } => {
@@ -195,10 +200,6 @@ macro setup_state_machine {
             try {
                 switch (state_machine.state.id) {
                     case 1:
-                        // `step_state` is the real work horse, which
-                        // walks through each statement in the task
-                        // body and compiles it to a single step in
-                        // the state machine.
                         step_state $task state_machine 1 { $body ... }
                 }
             } catch (e) {
