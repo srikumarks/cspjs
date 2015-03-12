@@ -24,13 +24,14 @@ function State() {
     return this;
 }
 
-function Suspension(fn, vars, id, argv, context, next) {
+function Suspension(fn, vars, id, argv, context, unwinding, prev) {
     this.fn = fn;
     this.vars = vars;
     this.id = id;
     this.argv = argv || [];
     this.context = context || null;
-    this.next = next;
+    this.unwinding = unwinding || []; // Make sure this is serializable.
+    this.prev = prev;
 }
 
 Suspension.prototype.toJSON = function () {
@@ -41,7 +42,8 @@ Suspension.prototype.toJSON = function () {
         id: this.id,
         argv: this.argv,
         context: this.context,
-        next: this.next
+        unwinding: this.unwinding,
+        prev: this.prev
     };
 };
 
@@ -50,7 +52,7 @@ Suspension.fromJSON = function (json) {
         throw new Error('Invalid suspension');
     }
 
-    return new Suspension(json.fn, json.vars, json.id, json.argv, json.context, json.next);
+    return new Suspension(json.fn, json.vars, json.id, json.argv, json.context, json.unwinding, json.prev);
 };
 
 function captureSuspension(state_machine, id) {
@@ -65,6 +67,7 @@ function captureSuspension(state_machine, id) {
             id, 
             [], 
             null, 
+            state_machine.captureUnwindingSequence(),
             (state_machine.finalCallback && state_machine.finalCallback.suspension) ? state_machine.finalCallback.suspension() : null
             );
 }
@@ -72,12 +75,14 @@ function captureSuspension(state_machine, id) {
 // Resumes the current state machine or the given one, from
 // the suspended state.
 function resumeSuspension(suspension, state_machine) {
+    state_machine.state.unwinding = suspension.unwinding.slice(0);
+
     if (state_machine.restoreStateVars) {
         state_machine.restoreStateVars(suspension.vars);
     }
 
-    if (suspension.next) {
-        state_machine.finalCallback = registry.resurrect(suspension.next);
+    if (suspension.prev) {
+        state_machine.finalCallback = registry.resurrect(suspension.prev);
     }
 
     var callback = state_machine.thenTo(suspension.id);
@@ -242,6 +247,11 @@ StateMachine.prototype.thenToWithErr = function (id) {
 //
 StateMachine.prototype.suspension = function (id) {
     return captureSuspension(this, id);
+};
+
+// Needs to capture the this.state.unwinding in a serializable form.
+StateMachine.prototype.captureUnwindingSequence = function () {
+    return this.state.unwinding.slice(0);
 };
 
 // StateMachine supports a single global error notification point.
