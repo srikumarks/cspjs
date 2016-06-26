@@ -43,7 +43,7 @@ Suspension.prototype.toJSON = function () {
         argv: this.argv,
         context: this.context,
         unwinding: this.unwinding,
-        prev: this.prev
+        prev: this.prev && this.prev.toJSON()
     };
 };
 
@@ -52,7 +52,9 @@ Suspension.fromJSON = function (json) {
         throw new Error('Invalid suspension');
     }
 
-    return new Suspension(json.fn, json.vars, json.id, json.argv, json.context, json.unwinding, json.prev);
+    return new Suspension(json.fn, json.vars, json.id, json.argv,
+                            json.context, json.unwinding,
+                            json.prev && Suspension.fromJSON(json.prev));
 };
 
 function captureSuspension(state_machine, id) {
