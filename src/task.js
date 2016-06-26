@@ -192,9 +192,9 @@ macro task {
 macro setup_state_machine {
     rule { $task $callback $formals { $body ... } } => {
         var StateMachine = arguments.callee.StateMachine || (arguments.callee.StateMachine = require('cspjs/src/state_machine'));
-        declare_state_arguments $formals ;
+        declare_state_arguments $formals
         var state_machine = new StateMachine(this, $callback, state_machine_fn, arguments.callee);
-        declare_state_variables $task state_machine 0 ($callback) { $body ... } 
+        declare_state_variables_wrapper $task state_machine 0 $formals { $body ... } 
         function state_machine_fn(err) {
             if (err && !state_machine.state.isUnwinding) { return state_machine.callback(err); }
             try {
@@ -216,6 +216,15 @@ macro setup_state_machine {
 // To do this, we scan the code and collect all the state variable identifiers
 // into a pseudo list syntax that looks like `(x y z ...)`. The `$vars` argument
 // to the `declare_state_variables` macro is expected to match this.
+
+macro declare_state_variables_wrapper {
+    rule { $task $state_machine $fin () { $body ... } } => {
+        declare_state_variables $task $state_machine $fin () { $body ... }
+    }
+    rule { $task $state_machine $fin ($formals:ident (,) ...) { $body ... } } => {
+        declare_state_variables $task $state_machine $fin ($formals ...) { $body ... }
+    }
+}
 
 macro declare_state_variables {
     rule { $task $state_machine $fin $vars { if ($x ...) { $then ... } else { $else ... } $rest ... } } => {
@@ -268,10 +277,15 @@ macro declare_unique_varset {
 		var vars = #{$v ...};
 		var varnames = vars.map(unwrapSyntax);
 		var uniqvarnames = {};
-		varnames.forEach(function (v) { uniqvarnames['%' + v] = true; });
-		letstx $uvars ... = Object.keys(uniqvarnames).map(function (v) { return makeIdent(v.substring(1), #{$task}); });
-		return #{ declare_varset $task $state_machine $fin ($uvars ...) ; };
-	}
+		varnames.pop(); // Remove the last callback argument from the state variable list.
+		if (varnames.length > 0) {
+			varnames.forEach(function (v) { uniqvarnames['%' + v] = true; });
+			letstx $uvars ... = Object.keys(uniqvarnames).map(function (v) { return makeIdent(v.substring(1), #{$task}); });
+			return #{ declare_varset $task $state_machine $fin ($uvars ...) ; };
+        } else {
+			return #{};
+        }
+    }
 }
 
 macro declare_varset {
@@ -294,11 +308,19 @@ macro declare_state_variables_step {
 	rule { $task $state_machine $fin ($v ...) { $x:ident := $y ... ; } { $rest ... } } => {
 		declare_state_variables $task $state_machine $fin ($x $v ...) { $rest ... }
 	}
+	// When suspending, we need to be able to capture state variables.
+	rule { $task $state_machine $fin ($v ...) { $x:ident <- suspend $y ... ; } { $rest ... } } => {
+		declare_state_variables $task $state_machine 1 ($x $v ...) { $rest ... }
+	}
 	rule { $task $state_machine $fin ($v ...) { $x:ident <- $y ... ; } { $rest ... } } => {
 		declare_state_variables $task $state_machine $fin ($x $v ...) { $rest ... }
 	}
 	rule { $task $state_machine $fin ($v ...) { $x:ident <<- $y ... ; } { $rest ... } } => {
 		declare_state_variables $task $state_machine $fin ($x $v ...) { $rest ... }
+	}
+	// When suspending, we need to be able to capture state variables.
+	rule { $task $state_machine $fin ($v ...) { $x:ident (,) ... <- suspend $y ... ; } { $rest ... } } => {
+		declare_state_variables $task $state_machine 1 ($x ... $v ...) { $rest ... }
 	}
 	rule { $task $state_machine $fin ($v ...) { $x:ident (,) ... <- $y ... ; } { $rest ... } } => {
 		declare_state_variables $task $state_machine $fin ($x ... $v ...) { $rest ... }
