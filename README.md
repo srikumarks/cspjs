@@ -27,7 +27,7 @@ scheme in detail.
 
 ## Installation
 
-1. You need to have [sweetjs][] installed with `npm install -g sweet.js`
+1. You need to have [sweetjs][] installed with `npm install -g sweet.js@0.7.8`
 2. Install cspjs using npm like this - `npm install cspjs` to get it into your `node_modules` directory.
 3. To compile a `.sjs` file that uses the `task` macro, do -
 
